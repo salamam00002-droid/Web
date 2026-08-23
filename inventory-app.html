@@ -717,7 +717,7 @@ function updateNotifications(){
   }
   if(overdue.length){
     html += `<div class="notif-section-title">⚠️ دفعات متأخرة</div>`;
-    html += overdue.map(t=>`<div class="notif-item" onclick="switchView('merchants'); closeNotifPanel();">${escapeHtml(t.merchantName)} — متبقي ${fmt(t.remaining)} (استحق ${t.dueDate})</div>`).join('');
+    html += overdue.map(t=>`<div class="notif-item" onclick="switchView('merchants'); closeNotifPanel();">${escapeHtml(t.merchantName)} — متبقي ${fmt(t.remaining)} (استحق ${fmtDate(t.dueDate)})</div>`).join('');
   }
   panel.innerHTML = html;
 }
@@ -726,6 +726,12 @@ function updateNotifications(){
 function fmt(n){
   n = Number(n)||0;
   return n.toLocaleString('ar-EG', {maximumFractionDigits:2});
+}
+function fmtDate(d){
+  if(!d) return '';
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return d;
+  return `${m[3]}/${m[2]}/${m[1]}`;
 }
 function issuedQtyFor(itemId){
   let sum = 0;
@@ -914,7 +920,7 @@ function renderMovements(){
   }
   tbody.innerHTML = stockMovements.map(m=>`
     <tr>
-      <td>${m.date||''}</td>
+      <td>${fmtDate(m.date)}</td>
       <td>${escapeHtml(m.itemName)}</td>
       <td>${m.type==='in' ? '<span class="pill paid">إضافة</span>' : '<span class="pill unpaid">خصم</span>'}</td>
       <td class="money">${m.type==='in'?'+':'-'}${fmt(m.qty)}</td>
@@ -1196,8 +1202,8 @@ function renderMerchants(){
         </div>
         <span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span>
       </div>
-      <div class="m-row"><span>التاريخ</span><span>${tx.date||''}</span></div>
-      ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${tx.dueDate}</span></div>`:''}
+      <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
+      ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${fmtDate(tx.dueDate)}</span></div>`:''}
       <div class="m-row"><span>عدد الأصناف</span><span>${(tx.items||[]).length}</span></div>
       <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
       <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
@@ -1238,13 +1244,13 @@ function openStatementModal(merchantName){
   document.getElementById('statementBody').innerHTML = `
     <div id="statementPrintArea">
       <h2 style="margin-bottom:4px;">${escapeHtml(merchantName)}</h2>
-      ${phone? `<p class="page-sub" style="margin-bottom:14px;">${escapeHtml(phone)}</p>`:'<div style="margin-bottom:14px;"></div>'}
+      ${phone? `<p class="page-sub" style="margin-bottom:14px;"><a href="tel:${escapeHtml(phone)}" style="color:inherit; text-decoration:none;">📞 ${escapeHtml(phone)}</a></p>`:'<div style="margin-bottom:14px;"></div>'}
 
       <div class="section-head" style="margin:10px 0 8px;"><h2 style="font-size:14px;">العمليات</h2></div>
       <table>
         <thead><tr><th>التاريخ</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
         <tbody>
-          ${txs.map(t=>`<tr><td>${t.date||''}</td><td>${(t.items||[]).length}</td><td class="money">${fmt(t.total)}</td><td class="money">${fmt(t.paid)}</td><td class="money">${fmt(t.remaining)}</td></tr>`).join('')}
+          ${txs.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${(t.items||[]).length}</td><td class="money">${fmt(t.total)}</td><td class="money">${fmt(t.paid)}</td><td class="money">${fmt(t.remaining)}</td></tr>`).join('')}
         </tbody>
       </table>
 
@@ -1260,7 +1266,7 @@ function openStatementModal(merchantName){
       <table>
         <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th></tr></thead>
         <tbody>
-          ${allPayments.length ? allPayments.map(p=>`<tr><td>${p.date||''}</td><td class="money">${fmt(p.amount)}</td><td>${escapeHtml(p.note||'')}</td></tr>`).join('') : '<tr><td colspan="3"><div class="empty">لا توجد دفعات مسجلة.</div></td></tr>'}
+          ${allPayments.length ? allPayments.map(p=>`<tr><td>${fmtDate(p.date)}</td><td class="money">${fmt(p.amount)}</td><td>${escapeHtml(p.note||'')}</td></tr>`).join('') : '<tr><td colspan="3"><div class="empty">لا توجد دفعات مسجلة.</div></td></tr>'}
         </tbody>
       </table>
 
@@ -1306,7 +1312,7 @@ function renderDashboard(){
   tbody.innerHTML = recent.length ? recent.map(tx=>`
     <tr>
       <td>${escapeHtml(tx.merchantName)}</td>
-      <td>${tx.date||''}</td>
+      <td>${fmtDate(tx.date)}</td>
       <td class="money">${fmt(tx.total)}</td>
       <td class="money">${fmt(tx.paid)}</td>
       <td class="money">${fmt(tx.remaining)}</td>
