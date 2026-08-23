@@ -197,9 +197,25 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const fmt = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('ar-EG');
 
 // ---------------- storage ----------------
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+  ]);
+}
 async function saveKey(key, value) {
-  try { await db.ref(key).set(value); }
-  catch (e) { console.error('firebase save failed', key, e); }
+  try {
+    await withTimeout(db.ref(key).set(value), 8000);
+    return true;
+  } catch (e) {
+    if (e && e.message === 'TIMEOUT') {
+      alert('لم يتم الحفظ: الاتصال بقاعدة البيانات ماخد وقت طويل جدًا (أكتر من 8 ثواني). تأكد من الإنترنت أو الشبكة.');
+    } else {
+      alert('لم يتم الحفظ، حدث خطأ: ' + (e && e.message ? e.message : e));
+    }
+    console.error('firebase save failed', key, e);
+    return false;
+  }
 }
 
 // ---------------- derived data ----------------
