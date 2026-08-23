@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مخزن شنط السفر</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#F6F1E6; --surface:#FFFFFF; --surfaceAlt:#FBF7EE;
+    --ink:#22303F; --inkSoft:#5C6B78;
+    --leather:#7A4B32; --leatherDark:#5C381F;
+    --brass:#C08829; --brassSoft:#E9C77A;
+    --border:#E3D9C3;
+    --success:#3F7D58; --successBg:#E7F1EA;
+    --danger:#B14B3D; --dangerBg:#F7E8E4;
+    --navy:#1E2A38;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);font-family:'Tajawal',sans-serif;color:var(--ink);}
+  #app{max-width:1100px;margin:0 auto;min-height:100vh;background:var(--bg);}
+  h1,h2,h3,.font-head{font-family:'Cairo',sans-serif;}
+
+  /* header */
+  .header{background:var(--navy);padding:20px 22px 0 22px;}
+  .header-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .logo{width:42px;height:42px;border-radius:12px;background:var(--brass);display:flex;align-items:center;justify-content:center;font-size:22px;}
+  .brand-title{color:#fff;font-weight:800;font-size:18px;font-family:'Cairo',sans-serif;}
+  .brand-sub{color:#B8C2CC;font-size:12px;margin-top:2px;}
+  .tabs{display:flex;gap:4px;margin-top:16px;}
+  .tab-btn{padding:10px 18px;border:none;border-radius:10px 10px 0 0;background:transparent;color:#B8C2CC;font-weight:700;font-family:'Tajawal',sans-serif;font-size:14px;cursor:pointer;}
+  .tab-btn.active{background:var(--bg);color:var(--ink);}
+
+  .content{padding:20px;}
+
+  /* buttons */
+  .btn{padding:10px 16px;border-radius:10px;font-weight:700;font-size:14px;font-family:'Tajawal',sans-serif;cursor:pointer;border:none;white-space:nowrap;transition:transform .1s;}
+  .btn:active{transform:scale(.96);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-primary{background:var(--leather);color:#fff;}
+  .btn-brass{background:var(--brass);color:#2b1c05;}
+  .btn-ghost{background:transparent;color:var(--leather);border:1.5px solid var(--leather);}
+  .btn-danger{background:transparent;color:var(--danger);border:1.5px solid var(--danger);}
+  .btn-subtle{background:var(--surfaceAlt);color:var(--ink);border:1px solid var(--border);}
+  .btn-sm{font-size:12px;padding:4px 0;background:transparent;border:none;font-weight:700;cursor:pointer;}
+
+  /* form elements */
+  input[type=text], input[type=number], input[type=tel], select{
+    padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);
+    background:var(--surfaceAlt);color:var(--ink);font-family:'Tajawal',sans-serif;font-size:14px;outline:none;width:100%;
+  }
+  input[type=color]{width:100%;height:40px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;padding:2px;}
+  label.field{display:flex;flex-direction:column;gap:6px;text-align:right;}
+  label.field span{font-size:12px;font-weight:700;color:var(--inkSoft);}
+
+  .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;}
+  .badge-success{background:var(--successBg);color:var(--success);}
+  .badge-danger{background:var(--dangerBg);color:var(--danger);}
+  .badge-brass{background:#FBF0D9;color:#8A5E14;}
+  .badge-muted{background:#EDE7D9;color:var(--inkSoft);}
+
+  /* dashboard */
+  .grid-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  @media(min-width:700px){.grid-cards{grid-template-columns:repeat(4,1fr);}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .card-label{font-size:12px;font-weight:700;color:var(--inkSoft);margin-bottom:4px;}
+  .card-value{font-size:20px;font-weight:800;font-family:'Cairo',sans-serif;}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:16px;}
+
+  /* items grid */
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .search-input{max-width:240px;}
+  .tag-grid{display:grid;grid-template-columns:1fr;gap:16px;}
+  @media(min-width:640px){.tag-grid{grid-template-columns:1fr 1fr;}}
+  @media(min-width:980px){.tag-grid{grid-template-columns:1fr 1fr 1fr;}}
+
+  .tag-card{position:relative;background:var(--surface);border:1.5px dashed var(--brassSoft);border-radius:14px;padding:16px;padding-top:22px;box-shadow:0 2px 8px rgba(90,60,20,0.06);}
+  .tag-hole{position:absolute;top:-10px;right:24px;width:20px;height:20px;border-radius:50%;background:var(--bg);border:2px solid var(--brassSoft);}
+  .tag-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
+  .tag-name{font-weight:800;font-size:16px;}
+  .color-row{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:6px;}
+  .color-dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--border);display:inline-block;}
+  .tag-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0;text-align:center;}
+  .stat-box{background:var(--surfaceAlt);border-radius:10px;padding:8px 4px;}
+  .stat-box.low{background:var(--dangerBg);}
+  .stat-box.ok{background:var(--successBg);}
+  .stat-label{font-size:11px;color:var(--inkSoft);}
+  .stat-value{font-weight:800;font-family:'Cairo',sans-serif;}
+  .tag-footer{display:flex;justify-content:space-between;align-items:center;}
+  .price-tag{font-weight:800;color:var(--brass);font-family:'Cairo',sans-serif;font-size:14px;}
+  .tag-actions{display:flex;gap:10px;}
+  .empty-box{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:40px;text-align:center;color:var(--inkSoft);font-size:14px;}
+
+  /* merchants */
+  .merchants-layout{display:flex;flex-direction:column;gap:16px;}
+  @media(min-width:860px){.merchants-layout{flex-direction:row;}}
+  .merchant-sidebar{flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+  @media(min-width:860px){.merchant-sidebar{width:280px;}}
+  .merchant-list{display:flex;flex-direction:column;gap:8px;max-height:540px;overflow-y:auto;}
+  .merchant-item-btn{text-align:right;border-radius:12px;padding:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-family:'Tajawal',sans-serif;}
+  .merchant-item-btn.active{background:var(--leather);border-color:var(--leather);}
+  .merchant-item-btn.active .m-name{color:#fff;}
+  .merchant-item-btn.active .m-total{color:#EAD9CC;}
+  .m-name{font-weight:800;font-size:14px;font-family:'Cairo',sans-serif;color:var(--ink);}
+  .m-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+  .m-total{font-size:12px;color:var(--inkSoft);}
+  .merchant-detail{flex:1;}
+  .merchant-detail-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
+  .merchant-detail-name{font-size:20px;font-weight:800;font-family:'Cairo',sans-serif;}
+  .merchant-detail-phone{font-size:12px;color:var(--inkSoft);margin-top:4px;}
+  .order-form{background:var(--surfaceAlt);border-radius:12px;padding:14px;margin-bottom:16px;}
+  .order-form-title{font-weight:800;font-size:14px;margin-bottom:10px;font-family:'Cairo',sans-serif;}
+  .order-form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .warn-text{font-size:12px;color:var(--inkSoft);padding-bottom:9px;}
+  .warn-text b{color:var(--danger);}
+
+  table.orders-table{width:100%;border-collapse:collapse;font-size:14px;}
+  table.orders-table th{text-align:right;font-size:12px;color:var(--inkSoft);padding-bottom:8px;font-weight:700;}
+  table.orders-table td{padding:8px 0;border-top:1px solid var(--border);}
+  table.orders-table input{width:80px;}
+  .line-total{font-weight:800;color:var(--leather);}
+
+  .payment-box{background:var(--surfaceAlt);border-radius:12px;padding:16px;margin-top:16px;display:flex;flex-direction:column;gap:12px;}
+  .payment-total-row{display:flex;justify-content:space-between;align-items:center;}
+  .payment-total-row .lbl{font-weight:800;font-family:'Cairo',sans-serif;}
+  .payment-total-row .val{font-weight:800;font-size:18px;font-family:'Cairo',sans-serif;}
+  .payment-bottom-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .advance-input-group{display:flex;gap:8px;}
+  .advance-input-group input{width:120px;}
+  .remaining-box{text-align:left;}
+  .remaining-label{font-size:12px;font-weight:700;color:var(--inkSoft);}
+  .remaining-value{font-weight:800;font-size:20px;font-family:'Cairo',sans-serif;}
+
+  /* modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(30,42,56,0.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;}
+  .modal-box.wide{max-width:640px;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .modal-title{font-size:17px;font-weight:800;font-family:'Cairo',sans-serif;}
+  .modal-close{width:30px;height:30px;border-radius:50%;border:none;background:var(--surfaceAlt);color:var(--inkSoft);font-size:16px;font-weight:700;cursor:pointer;}
+  .modal-form{display:flex;flex-direction:column;gap:14px;}
+  .form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">🧳</div>
+      <div>
+        <div class="brand-title">مخزن شنط السفر</div>
+        <div class="brand-sub">إدارة الأصناف والتجار والحسابات</div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button class="tab-btn" data-action="switch-tab" data-tab="dashboard">لوحة التحكم</button>
+      <button class="tab-btn" data-action="switch-tab" data-tab="items">الأصناف</button>
+      <button class="tab-btn" data-action="switch-tab" data-tab="merchants">التجار</button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<div id="modal-root"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script>
+// ---------------- firebase ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyAHnAeKyH_sZEQtkcYsXAUp2DodpA_0TZw",
+  authDomain: "inventory-935d5.firebaseapp.com",
+  databaseURL: "https://inventory-935d5-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId: "inventory-935d5",
+  storageBucket: "inventory-935d5.firebasestorage.app",
+  messagingSenderId: "1008510500001",
+  appId: "1:1008510500001:web:a150d19ee24de4025f04e0"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ---------------- state ----------------
+const state = {
+  items: [],
+  merchants: [],
+  tab: 'dashboard',
+  activeMerchantId: null,
+  itemSearch: '',
+  merchantSearch: '',
+  loaded: false,
+};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const fmt = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('ar-EG');
+
+// ---------------- storage ----------------
+async function saveKey(key, value) {
+  try { await db.ref(key).set(value); }
+  catch (e) { console.error('firebase save failed', key, e); }
+}
+
+// ---------------- derived data ----------------
+function dispensedByItem() {
+  const map = {};
+  state.merchants.forEach(m => (m.orders || []).forEach(o => {
+    map[o.itemId] = (map[o.itemId] || 0) + Number(o.qty || 0);
+  }));
+  return map;
+}
+function itemsWithCalc() {
+  const disp = dispensedByItem();
+  return state.items.map(it => {
+    const dispensed = disp[it.id] || 0;
+    return { ...it, dispensed, remaining: Number(it.stockQty || 0) - dispensed };
+  });
+}
+function merchantsWithCalc() {
+  return state.merchants.map(m => {
+    const total = (m.orders || []).reduce((s, o) => s + Number(o.qty || 0) * Number(o.price || 0), 0);
+    const remaining = total - Number(m.advancePaid || 0);
+    return { ...m, total, remaining };
+  });
+}
+
+// ---------------- render root ----------------
+function render() {
+  document.querySelectorAll('#tabs .tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === state.tab);
+  });
+  const content = document.getElementById('content');
+  if (state.tab === 'dashboard') content.innerHTML = renderDashboard();
+  else if (state.tab === 'items') content.innerHTML = renderItemsTab();
+  else content.innerHTML = renderMerchantsTab();
+
+  if (state.tab === 'items') attachItemsListeners();
+  if (state.tab === 'merchants') attachMerchantsListeners();
+}
+
+// ---------------- DASHBOARD ----------------
+function renderDashboard() {
+  const items = itemsWithCalc();
+  const merchants = merchantsWithCalc();
+  const totalStock = items.reduce((s, i) => s + Number(i.stockQty || 0), 0);
+  const totalDispensed = items.reduce((s, i) => s + i.dispensed, 0);
+  const totalRemainingStock = items.reduce((s, i) => s + i.remaining, 0);
+  const totalStockValue = items.reduce((s, i) => s + Number(i.stockQty || 0) * Number(i.price || 0), 0);
+  const totalOwed = merchants.reduce((s, m) => s + Math.max(m.remaining, 0), 0);
+  const totalCollected = merchants.reduce((s, m) => s + Number(m.advancePaid || 0), 0);
+  const totalSalesValue = merchants.reduce((s, m) => s + m.total, 0);
+
+  const cards = [
+    ['عدد الأصناف', items.length, 'var(--ink)'],
+    ['إجمالي المخزون', fmt(totalStock), 'var(--ink)'],
+    ['إجمالي المنصرف', fmt(totalDispensed), 'var(--leather)'],
+    ['المتبقي بالمخزن', fmt(totalRemainingStock), 'var(--success)'],
+    ['قيمة المخزون الحالي', fmt(totalStockValue) + ' ج.م', 'var(--brass)'],
+    ['إجمالي المبيعات للتجار', fmt(totalSalesValue) + ' ج.م', 'var(--leather)'],
+    ['المحصّل من التجار', fmt(totalCollected) + ' ج.م', 'var(--success)'],
+    ['إجمالي المستحق (متبقي على التجار)', fmt(totalOwed) + ' ج.م', 'var(--danger)'],
+  ];
+
+  const low = items.filter(i => i.remaining <= (Number(i.lowStockAlert) || 0));
+
+  return `
+    <div class="grid-cards">
+      ${cards.map(([label, value, color]) => `
+        <div class="card">
+          <div class="card-label">${label}</div>
+          <div class="card-value" style="color:${color}">${value}</div>
+        </div>`).join('')}
+    </div>
+    <div class="panel">
+      <h3 style="margin:0 0 12px 0;font-size:15px;">أصناف قاربت على النفاد</h3>
+      ${low.length === 0
+        ? `<div style="font-size:14px;color:var(--inkSoft);">لا توجد أصناف منخفضة المخزون حاليًا.</div>`
+        : low.map(i => `
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:6px 0;">
+            <span>${escapeHtml(i.name)}</span>
+            <span class="badge badge-danger">متبقي ${fmt(i.remaining)}</span>
+          </div>`).join('')}
+    </div>
+  `;
+}
+
+// ---------------- ITEMS TAB ----------------
+function renderItemsTab() {
+  return `
+    <div class="toolbar">
+      <input id="item-search-input" type="text" class="search-input" placeholder="بحث عن صنف..." value="${escapeHtml(state.itemSearch)}">
+      <button class="btn btn-primary" data-action="open-item-modal">+ إضافة صنف جديد</button>
+    </div>
+    <div id="items-list-container"></div>
+  `;
+}
+function renderItemsList() {
+  const items = itemsWithCalc().filter(i => !state.itemSearch || i.name.toLowerCase().includes(state.itemSearch.toLowerCase()));
+  if (items.length === 0) {
+    return `<div class="empty-box">لا توجد أصناف بعد. اضغط "إضافة صنف جديد" للبدء.</div>`;
+  }
+  return `<div class="tag-grid">${items.map(renderTagCard).join('')}</div>`;
+}
+function renderTagCard(it) {
+  const low = it.remaining <= 0;
+  return `
+    <div class="tag-card">
+      <div class="tag-hole"></div>
+      <div class="tag-head">
+        <div>
+          <div class="tag-name">${escapeHtml(it.name)}</div>
+          <div class="color-row">
+            <span class="color-dot" style="background:${it.color || '#ccc'}"></span>
+            <span style="font-size:12px;color:var(--inkSoft);">${escapeHtml(it.colorName || 'بدون لون محدد')}</span>
+          </div>
+        </div>
+        <span class="badge badge-brass">${fmt(it.piecesPerSet)} قطع/طقم</span>
+      </div>
+      <div class="tag-stats">
+        <div class="stat-box"><div class="stat-label">المخزون</div><div class="stat-value">${fmt(it.stockQty)}</div></div>
+        <div class="stat-box"><div class="stat-label">المنصرف</div><div class="stat-value" style="color:var(--leather)">${fmt(it.dispensed)}</div></div>
+        <div class="stat-box ${low ? 'low' : 'ok'}"><div class="stat-label">المتبقي</div><div class="stat-value" style="color:${low ? 'var(--danger)' : 'var(--success)'}">${fmt(it.remaining)}</div></div>
+      </div>
+      <div class="tag-footer">
+        <span class="price-tag">${fmt(it.price)} ج.م / طقم</span>
+        <div class="tag-actions">
+          <button class="btn-sm" style="color:var(--leather)" data-action="edit-item" data-id="${it.id}">تعديل</button>
+          <button class="btn-sm" style="color:var(--danger)" data-action="delete-item" data-id="${it.id}">حذف</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function attachItemsListeners() {
+  const listContainer = document.getElementById('items-list-container');
+  listContainer.innerHTML = renderItemsList();
+
+  document.getElementById('item-search-input').addEventListener('input', (e) => {
+    state.itemSearch = e.target.value;
+    document.getElementById('items-list-container').innerHTML = renderItemsList();
+  });
+}
+
+// ---------------- MERCHANTS TAB ----------------
+function renderMerchantsTab() {
+  return `
+    <div class="merchants-layout">
+      <div class="merchant-sidebar">
+        <input id="merchant-search-input" type="text" placeholder="بحث عن تاجر..." value="${escapeHtml(state.merchantSearch)}">
+        <button class="btn btn-primary" data-action="open-merchant-modal">+ إضافة تاجر</button>
+        <div id="merchant-list-container" class="merchant-list"></div>
+      </div>
+      <div class="merchant-detail" id="merchant-detail-container"></div>
+    </div>
+  `;
+}
+function renderMerchantList() {
+  const merchants = merchantsWithCalc().filter(m => !state.merchantSearch || m.name.toLowerCase().includes(state.merchantSearch.toLowerCase()));
+  if (merchants.length === 0) {
+    return `<div style="text-align:center;padding:24px 0;color:var(--inkSoft);font-size:14px;">لا يوجد تجار بعد.</div>`;
+  }
+  return merchants.map(m => `
+    <button class="merchant-item-btn ${state.activeMerchantId === m.id ? 'active' : ''}" data-action="select-merchant" data-id="${m.id}">
+      <div class="m-name">${escapeHtml(m.name)}</div>
+      <div class="m-row">
+        <span class="m-total">الإجمالي ${fmt(m.total)} ج.م</span>
+        ${m.remaining > 0
+          ? `<span class="badge ${state.activeMerchantId === m.id ? 'badge-brass' : 'badge-danger'}">باقي ${fmt(m.remaining)}</span>`
+          : `<span class="badge ${state.activeMerchantId === m.id ? 'badge-brass' : 'badge-success'}">مسدد بالكامل</span>`}
+      </div>
+    </button>
+  `).join('');
+}
+function renderMerchantDetail() {
+  const merchants = merchantsWithCalc();
+  const merchant = merchants.find(m => m.id === state.activeMerchantId);
+  if (!merchant) {
+    return `<div class="empty-box" style="height:100%;display:flex;align-items:center;justify-content:center;">اختر تاجرًا من القائمة، أو أضف تاجرًا جديدًا لعرض تفاصيل حسابه.</div>`;
+  }
+  const items = itemsWithCalc();
+  const orders = merchant.orders || [];
+  const selItemOptions = items.map(i => `<option value="${i.id}">${escapeHtml(i.name)}${i.colorName ? ' - ' + escapeHtml(i.colorName) : ''} (متبقي ${fmt(i.remaining)})</option>`).join('');
+
+  return `
+    <div class="panel" style="margin-top:0;">
+      <div class="merchant-detail-head">
+        <div>
+          <div class="merchant-detail-name">${escapeHtml(merchant.name)}</div>
+          ${merchant.phone ? `<div class="merchant-detail-phone">${escapeHtml(merchant.phone)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-subtle" data-action="edit-merchant-info" data-id="${merchant.id}">تعديل البيانات</button>
+          <button class="btn btn-danger" data-action="delete-merchant" data-id="${merchant.id}">حذف التاجر</button>
+        </div>
+      </div>
+
+      <div class="order-form">
+        <div class="order-form-title">إضافة صنف لحساب التاجر</div>
+        <div class="order-form-row">
+          <label class="field" style="width:230px;">
+            <span>الصنف</span>
+            <select id="order-item-select">${items.length === 0 ? '<option value="">لا توجد أصناف</option>' : selItemOptions}</select>
+          </label>
+          <label class="field" style="width:90px;">
+            <span>الكمية</span>
+            <input id="order-qty-input" type="number" min="1" value="1">
+          </label>
+          <div class="warn-text" id="order-warn-text"></div>
+          <button class="btn btn-brass" data-action="add-order-line" data-merchant-id="${merchant.id}" ${items.length === 0 ? 'disabled' : ''}>+ إضافة للحساب</button>
+        </div>
+      </div>
+
+      ${orders.length === 0
+        ? `<div style="text-align:center;padding:24px 0;color:var(--inkSoft);font-size:14px;">لم يتم إضافة أي أصناف لهذا التاجر بعد.</div>`
+        : `<div style="overflow-x:auto;">
+        <table class="orders-table">
+          <thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th></th></tr></thead>
+          <tbody>
+            ${orders.map(o => {
+              const itemObj = items.find(i => i.id === o.itemId);
+              return `
+                <tr>
+                  <td style="font-weight:700;">${itemObj ? escapeHtml(itemObj.name) : 'صنف محذوف'}</td>
+                  <td><input type="number" min="1" value="${o.qty}" data-action="update-line-qty" data-merchant-id="${merchant.id}" data-line-id="${o.id}"></td>
+                  <td><input type="number" min="0" value="${o.price}" data-action="update-line-price" data-merchant-id="${merchant.id}" data-line-id="${o.id}"></td>
+                  <td class="line-total">${fmt(Number(o.qty) * Number(o.price))} ج.م</td>
+                  <td><button class="btn-sm" style="color:var(--danger)" data-action="remove-order-line" data-merchant-id="${merchant.id}" data-line-id="${o.id}">حذف</button></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+
+      <div class="payment-box">
+        <div class="payment-total-row">
+          <span class="lbl">إجمالي الحساب</span>
+          <span class="val">${fmt(merchant.total)} ج.م</span>
+        </div>
+        <div class="payment-bottom-row">
+          <label class="field">
+            <span>المبلغ المدفوع مقدمًا</span>
+            <div class="advance-input-group">
+              <input id="advance-input" type="number" min="0" value="${merchant.advancePaid || 0}">
+              <button class="btn btn-subtle" data-action="save-advance" data-merchant-id="${merchant.id}">حفظ</button>
+            </div>
+          </label>
+          <div class="remaining-box">
+            <div class="remaining-label">المبلغ المتبقي</div>
+            <div class="remaining-value" style="color:${merchant.remaining > 0 ? 'var(--danger)' : 'var(--success)'}">
+              ${fmt(Math.abs(merchant.remaining))} ج.م
+              ${merchant.remaining <= 0 && merchant.total > 0 ? ' (مسدد بالكامل)' : ''}
+              ${merchant.remaining < 0 ? ' (زيادة مدفوعة)' : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function attachMerchantsListeners() {
+  document.getElementById('merchant-list-container').innerHTML = renderMerchantList();
+  document.getElementById('merchant-detail-container').innerHTML = renderMerchantDetail();
+
+  document.getElementById('merchant-search-input').addEventListener('input', (e) => {
+    state.merchantSearch = e.target.value;
+    document.getElementById('merchant-list-container').innerHTML = renderMerchantList();
+    attachMerchantListSelectHandlers();
+  });
+
+  const qtyInput = document.getElementById('order-qty-input');
+  const itemSelect = document.getElementById('order-item-select');
+  function updateWarn() {
+    const items = itemsWithCalc();
+    const itemObj = items.find(i => i.id === itemSelect.value);
+    const warn = document.getElementById('order-warn-text');
+    if (!itemObj) { warn.innerHTML = ''; return; }
+    let html = `سعر الطقم: ${fmt(itemObj.price)} ج.م`;
+    if (Number(qtyInput.value) > itemObj.remaining) html += ` — <b>الكمية تتجاوز المتبقي بالمخزن!</b>`;
+    warn.innerHTML = html;
+  }
+  if (itemSelect && qtyInput) {
+    itemSelect.addEventListener('change', updateWarn);
+    qtyInput.addEventListener('input', updateWarn);
+    updateWarn();
+  }
+
+  document.querySelectorAll('[data-action="update-line-qty"]').forEach(el => {
+    el.addEventListener('change', (e) => {
+      updateOrderLine(e.target.dataset.merchantId, e.target.dataset.lineId, { qty: Number(e.target.value) || 0 });
+    });
+  });
+  document.querySelectorAll('[data-action="update-line-price"]').forEach(el => {
+    el.addEventListener('change', (e) => {
+      updateOrderLine(e.target.dataset.merchantId, e.target.dataset.lineId, { price: Number(e.target.value) || 0 });
+    });
+  });
+}
+function attachMerchantListSelectHandlers() {
+  // handled via global delegation, nothing extra needed
+}
+
+// ---------------- mutations ----------------
+function persistItems() { saveKey('items', state.items); }
+function persistMerchants() { saveKey('merchants', state.merchants); }
+
+function saveItemForm(form) {
+  if (form.id) {
+    state.items = state.items.map(it => it.id === form.id ? { ...form } : it);
+  } else {
+    state.items.push({ ...form, id: uid() });
+  }
+  persistItems();
+  closeModal();
+  render();
+}
+function deleteItemById(id) {
+  state.items = state.items.filter(i => i.id !== id);
+  state.merchants = state.merchants.map(m => ({ ...m, orders: (m.orders || []).filter(o => o.itemId !== id) }));
+  persistItems();
+  persistMerchants();
+  closeModal();
+  render();
+}
+function saveMerchantForm(form) {
+  if (form.id) {
+    state.merchants = state.merchants.map(m => m.id === form.id ? { ...m, ...form } : m);
+  } else {
+    const newM = { id: uid(), name: form.name, phone: form.phone || '', orders: [], advancePaid: 0 };
+    state.merchants.push(newM);
+    state.activeMerchantId = newM.id;
+  }
+  persistMerchants();
+  closeModal();
+  render();
+}
+function deleteMerchantById(id) {
+  state.merchants = state.merchants.filter(m => m.id !== id);
+  if (state.activeMerchantId === id) state.activeMerchantId = null;
+  persistMerchants();
+  closeModal();
+  render();
+}
+function addOrderLine(merchantId, itemId, qty) {
+  if (!itemId || !qty || Number(qty) <= 0) return;
+  const items = itemsWithCalc();
+  const itemObj = items.find(i => i.id === itemId);
+  if (!itemObj) return;
+  const m = state.merchants.find(x => x.id === merchantId);
+  if (!m) return;
+  m.orders = m.orders || [];
+  const existing = m.orders.find(o => o.itemId === itemId);
+  if (existing) existing.qty = Number(existing.qty) + Number(qty);
+  else m.orders.push({ id: uid(), itemId, qty: Number(qty), price: Number(itemObj.price) || 0 });
+  persistMerchants();
+  render();
+}
+function updateOrderLine(merchantId, lineId, patch) {
+  const m = state.merchants.find(x => x.id === merchantId);
+  if (!m) return;
+  m.orders = (m.orders || []).map(o => o.id === lineId ? { ...o, ...patch } : o);
+  persistMerchants();
+  render();
+}
+function removeOrderLine(merchantId, lineId) {
+  const m = state.merchants.find(x => x.id === merchantId);
+  if (!m) return;
+  m.orders = (m.orders || []).filter(o => o.id !== lineId);
+  persistMerchants();
+  render();
+}
+function saveAdvance(merchantId, value) {
+  const m = state.merchants.find(x => x.id === merchantId);
+  if (!m) return;
+  m.advancePaid = Number(value) || 0;
+  persistMerchants();
+  render();
+}
+
+// ---------------- modals ----------------
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+function openItemModal(item) {
+  const it = item || {};
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-overlay" data-action="overlay-close">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div class="modal-title">${it.id ? 'تعديل الصنف' : 'إضافة صنف جديد'}</div>
+          <button class="modal-close" data-action="close-modal">×</button>
+        </div>
+        <div class="modal-form">
+          <label class="field"><span>اسم الصنف *</span><input id="f-name" type="text" value="${escapeAttr(it.name || '')}" placeholder="مثال: طقم شنط سفر كلاسيك"></label>
+          <div class="form-row-2">
+            <label class="field"><span>لون الصنف</span><input id="f-color" type="color" value="${it.color || '#7A4B32'}"></label>
+            <label class="field"><span>اسم اللون (اختياري)</span><input id="f-colorName" type="text" value="${escapeAttr(it.colorName || '')}" placeholder="مثال: بني جملي"></label>
+          </div>
+          <div class="form-row-2">
+            <label class="field"><span>عدد القطع بالطقم</span><input id="f-pieces" type="number" min="1" value="${it.piecesPerSet ?? 3}"></label>
+            <label class="field"><span>سعر الطقم (ج.م)</span><input id="f-price" type="number" min="0" value="${it.price ?? ''}" placeholder="0"></label>
+          </div>
+          <div class="form-row-2">
+            <label class="field"><span>الكمية بالمخزن (عدد الأطقم)</span><input id="f-stock" type="number" min="0" value="${it.stockQty ?? ''}" placeholder="0"></label>
+            <label class="field"><span>تنبيه عند وصول المتبقي إلى</span><input id="f-lowStock" type="number" min="0" value="${it.lowStockAlert ?? 2}"></label>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-subtle" data-action="close-modal">إلغاء</button>
+            <button class="btn btn-primary" data-action="submit-item" data-id="${it.id || ''}">${it.id ? 'حفظ التعديلات' : 'إضافة الصنف'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function openMerchantModal(merchant) {
+  const m = merchant || {};
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-overlay" data-action="overlay-close">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div class="modal-title">${m.id ? 'تعديل بيانات التاجر' : 'إضافة تاجر جديد'}</div>
+          <button class="modal-close" data-action="close-modal">×</button>
+        </div>
+        <div class="modal-form">
+          <label class="field"><span>اسم التاجر *</span><input id="f-mname" type="text" value="${escapeAttr(m.name || '')}" placeholder="اسم التاجر أو المحل"></label>
+          <label class="field"><span>رقم الهاتف (اختياري)</span><input id="f-mphone" type="tel" value="${escapeAttr(m.phone || '')}" placeholder="01xxxxxxxxx"></label>
+          <div class="modal-actions">
+            <button class="btn btn-subtle" data-action="close-modal">إلغاء</button>
+            <button class="btn btn-primary" data-action="submit-merchant" data-id="${m.id || ''}">${m.id ? 'حفظ' : 'إضافة'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function openConfirmDelete(type, id, name) {
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-overlay" data-action="overlay-close">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <div class="modal-title">تأكيد الحذف</div>
+          <button class="modal-close" data-action="close-modal">×</button>
+        </div>
+        <p style="font-size:14px;margin-bottom:20px;">هل أنت متأكد من حذف <strong>${escapeHtml(name)}</strong>؟ لا يمكن التراجع عن هذا الإجراء.</p>
+        <div class="modal-actions">
+          <button class="btn btn-subtle" data-action="close-modal">إلغاء</button>
+          <button class="btn btn-danger" data-action="confirm-delete" data-type="${type}" data-id="${id}">حذف نهائيًا</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ---------------- utils ----------------
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(str) { return escapeHtml(str); }
+
+// ---------------- global click delegation ----------------
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.dataset.action;
+
+  if (action === 'switch-tab') { state.tab = el.dataset.tab; render(); }
+  else if (action === 'open-item-modal') { openItemModal(null); }
+  else if (action === 'edit-item') { const it = state.items.find(i => i.id === el.dataset.id); openItemModal(it); }
+  else if (action === 'delete-item') { const it = state.items.find(i => i.id === el.dataset.id); openConfirmDelete('item', it.id, it.name); }
+  else if (action === 'submit-item') {
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) return;
+    saveItemForm({
+      id: el.dataset.id || null,
+      name,
+      color: document.getElementById('f-color').value,
+      colorName: document.getElementById('f-colorName').value.trim(),
+      piecesPerSet: Number(document.getElementById('f-pieces').value) || 0,
+      price: Number(document.getElementById('f-price').value) || 0,
+      stockQty: Number(document.getElementById('f-stock').value) || 0,
+      lowStockAlert: Number(document.getElementById('f-lowStock').value) || 0,
+    });
+  }
+  else if (action === 'open-merchant-modal') { openMerchantModal(null); }
+  else if (action === 'edit-merchant-info') { const m = state.merchants.find(x => x.id === el.dataset.id); openMerchantModal(m); }
+  else if (action === 'submit-merchant') {
+    const name = document.getElementById('f-mname').value.trim();
+    if (!name) return;
+    saveMerchantForm({ id: el.dataset.id || null, name, phone: document.getElementById('f-mphone').value.trim() });
+  }
+  else if (action === 'select-merchant') { state.activeMerchantId = el.dataset.id; render(); }
+  else if (action === 'delete-merchant') { const m = state.merchants.find(x => x.id === el.dataset.id); openConfirmDelete('merchant', m.id, m.name); }
+  else if (action === 'confirm-delete') {
+    if (el.dataset.type === 'item') deleteItemById(el.dataset.id);
+    else deleteMerchantById(el.dataset.id);
+  }
+  else if (action === 'add-order-line') {
+    const itemSelect = document.getElementById('order-item-select');
+    const qtyInput = document.getElementById('order-qty-input');
+    addOrderLine(el.dataset.merchantId, itemSelect.value, qtyInput.value);
+  }
+  else if (action === 'remove-order-line') { removeOrderLine(el.dataset.merchantId, el.dataset.lineId); }
+  else if (action === 'save-advance') {
+    const val = document.getElementById('advance-input').value;
+    saveAdvance(el.dataset.merchantId, val);
+  }
+  else if (action === 'close-modal' || action === 'overlay-close') { closeModal(); }
+});
+
+// ---------------- init ----------------
+(async function init() {
+  const [itemsSnap, merchantsSnap] = await Promise.all([db.ref('items').get(), db.ref('merchants').get()]);
+  state.items = itemsSnap.val() || [];
+  state.merchants = merchantsSnap.val() || [];
+  state.loaded = true;
+  render();
+
+  // realtime sync — reflect changes made from other devices/tabs automatically
+  db.ref('items').on('value', (snap) => {
+    if (!state.loaded) return;
+    state.items = snap.val() || [];
+    render();
+  });
+  db.ref('merchants').on('value', (snap) => {
+    if (!state.loaded) return;
+    state.merchants = snap.val() || [];
+    render();
+  });
+})();
+</script>
+</body>
+</html>
