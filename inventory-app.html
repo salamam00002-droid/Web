@@ -184,6 +184,24 @@
     background:var(--cream); border:1px solid var(--line); padding:2px 8px; border-radius:20px; color:var(--muted);
   }
 
+  /* ---------- merchant cards (stacked) ---------- */
+  .merchant-card{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:18px 20px; margin-bottom:14px;
+  }
+  .merchant-card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
+  .merchant-card-head h3{font-size:16px; font-weight:800;}
+  .merchant-card-head .phone{font-size:12px; color:var(--muted); margin-top:3px;}
+  .merchant-card .m-row{
+    display:flex; justify-content:space-between; align-items:center; font-size:13.5px;
+    padding:7px 0; border-top:1px dashed var(--line);
+  }
+  .merchant-card .m-row:first-of-type{border-top:1px solid var(--line); margin-top:4px;}
+  .merchant-card .m-row span:first-child{color:var(--muted);}
+  .merchant-card .m-row span:last-child{font-weight:800; font-family:'Cairo',sans-serif; font-size:15px;}
+  .merchant-card .m-row.remaining span:last-child{color:var(--red);}
+  .merchant-card .actions{display:flex; gap:8px; margin-top:14px;}
+
   /* ---------- table (merchants list) ---------- */
   table{width:100%; border-collapse:collapse; font-size:13.5px;}
   th{
@@ -197,6 +215,25 @@
   .pill.paid{background:#E5F3EA; color:var(--green);}
   .pill.partial{background:#FDF2E3; color:var(--gold-dark);}
   .pill.unpaid{background:#FBEDEA; color:var(--red);}
+  .pill.overdue{background:#FBEDEA; color:var(--red); border:1px solid var(--red);}
+
+  /* ---------- notification bell ---------- */
+  .notif-bell{position:relative; cursor:pointer; font-size:19px; color:#D8CBA8; line-height:1;}
+  .notif-badge{
+    position:absolute; top:-7px; inset-inline-start:-8px; background:var(--red); color:#fff; font-size:10px; font-weight:800;
+    min-width:16px; height:16px; border-radius:10px; display:none; align-items:center; justify-content:center; padding:0 4px;
+  }
+  .notif-badge.show{display:flex;}
+  .notif-panel{
+    display:none; position:absolute; top:34px; inset-inline-end:0; width:290px; max-width:calc(100vw - 24px); max-height:340px; overflow-y:auto;
+    background:var(--paper); color:var(--ink); border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.3);
+    z-index:300; padding:8px; box-sizing:border-box;
+  }
+  .notif-panel.active{display:block;}
+  .notif-section-title{font-size:11px; font-weight:800; color:var(--muted); padding:8px 8px 2px;}
+  .notif-item{font-size:12.5px; padding:8px; border-radius:8px; cursor:pointer; line-height:1.6;}
+  .notif-item:hover{background:var(--cream);}
+  .notif-empty{font-size:12.5px; color:var(--muted); padding:16px 10px; text-align:center;}
 
   /* ---------- modal ---------- */
   .overlay{
@@ -226,6 +263,17 @@
     padding:8px 0; border-bottom:1px dashed var(--line);
   }
   .merchant-item-row .sub{font-size:11.5px; color:var(--muted);}
+
+  .payment-row{
+    display:grid; grid-template-columns:1fr 1fr 1.2fr auto; gap:8px; align-items:center;
+    padding:8px 0; border-bottom:1px dashed var(--line);
+  }
+  .payment-row:last-child{border-bottom:none;}
+  .payments-empty{color:var(--muted); font-size:12.5px; padding:8px 0;}
+  @media(max-width:640px){
+    .payment-row{grid-template-columns:1fr 1fr;}
+    .payment-row .payment-note{grid-column:1/3;}
+  }
   .totals-box{
     background:var(--cream); border-radius:10px; padding:14px 16px; margin-top:14px;
   }
@@ -251,18 +299,36 @@
     .merchant-item-row{grid-template-columns:1fr 1fr; }
     header{padding:14px 16px;}
   }
+
+  @media print{
+    body.printing-statement > *:not(#statementModalOverlay){display:none !important;}
+    body.printing-statement{padding:0; background:#fff;}
+    body.printing-statement #statementModalOverlay{
+      position:static; background:none; padding:0; display:block !important;
+    }
+    body.printing-statement .modal{max-width:100%; max-height:none; box-shadow:none; border:none; margin:0;}
+    body.printing-statement .modal-head, body.printing-statement .modal-foot{display:none;}
+  }
 </style>
 </head>
 <body>
 
 <header>
   <div class="brand">🧳 مخزون الشنط <span class="tag">SUITCASE STOCK</span></div>
-  <div id="connStatus" class="offline"><span class="dot"></span><span id="connText">غير متصل</span></div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div id="notifBell" class="notif-bell" onclick="toggleNotifPanel()">
+      🔔<span id="notifBadge" class="notif-badge">0</span>
+      <div id="notifPanel" class="notif-panel"></div>
+    </div>
+    <div id="connStatus" class="offline"><span class="dot"></span><span id="connText">غير متصل</span></div>
+  </div>
 </header>
 
 <nav id="mainNav" style="display:none;">
   <button data-view="dashboard" class="active">لوحة التحكم</button>
   <button data-view="items">الأصناف</button>
+  <button data-view="remaining">المخزون المتبقي</button>
+  <button data-view="movements">سجل الحركة</button>
   <button data-view="merchants">التجار</button>
 </nav>
 
@@ -345,6 +411,33 @@
     <div id="itemsGrid" class="items-grid"></div>
   </div>
 
+  <!-- ========== REMAINING STOCK VIEW ========== -->
+  <div id="view-remaining" class="view">
+    <div class="section-head" style="margin-top:0;">
+      <div>
+        <div class="page-title">المخزون المتبقي</div>
+        <div class="page-sub">نظرة سريعة على الكمية المتبقية من كل صنف بالمخزن (بعد خصم ما أُخذ من التجار)</div>
+      </div>
+    </div>
+    <div id="remainingList" class="items-grid"></div>
+  </div>
+
+  <!-- ========== STOCK MOVEMENTS LOG VIEW ========== -->
+  <div id="view-movements" class="view">
+    <div class="section-head" style="margin-top:0;">
+      <div>
+        <div class="page-title">سجل حركة المخزون</div>
+        <div class="page-sub">كل عمليات إضافة وخصم الكمية بتاريخها، بدل الاعتماد على الحساب الآني فقط</div>
+      </div>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table id="movementsTable">
+        <thead><tr><th>التاريخ</th><th>الصنف</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- ========== MERCHANTS VIEW ========== -->
   <div id="view-merchants" class="view">
     <div class="section-head" style="margin-top:0;">
@@ -354,12 +447,7 @@
       </div>
       <button class="btn btn-gold" onclick="openMerchantModal()">+ عملية جديدة</button>
     </div>
-    <div class="card" style="overflow-x:auto;">
-      <table id="merchantsTable">
-        <thead><tr><th>التاجر</th><th>التاريخ</th><th>عدد الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <div id="merchantsCards"></div>
   </div>
 
 
@@ -395,6 +483,10 @@
           <label>الكمية بالمخزن (عدد الأطقم)</label>
           <input id="itemStock" type="number" min="0" value="0">
         </div>
+        <div class="field">
+          <label>حد التنبيه (اختياري)</label>
+          <input id="itemAlertThreshold" type="number" min="0" placeholder="افتراضي: 10% من الكمية (وحد أدنى 2)">
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -426,6 +518,10 @@
           <label>التاريخ</label>
           <input id="merchantDate" type="date">
         </div>
+        <div class="field">
+          <label>تاريخ استحقاق السداد (اختياري)</label>
+          <input id="merchantDueDate" type="date">
+        </div>
       </div>
 
       <div class="section-head" style="margin:18px 0 8px;">
@@ -436,10 +532,16 @@
 
       <div class="totals-box">
         <div class="line"><span>إجمالي الحساب</span><span id="mTotal">0</span></div>
-        <div class="field" style="margin-top:8px;">
-          <label>المبلغ المدفوع مقدماً</label>
-          <input id="merchantPaid" type="number" min="0" step="0.01" value="0" oninput="recalcMerchantTotals()">
-        </div>
+      </div>
+
+      <div class="section-head" style="margin:18px 0 8px;">
+        <h2 style="font-size:14px;">الدفعات</h2>
+        <button class="btn btn-outline btn-sm" onclick="addPaymentRow()">+ إضافة دفعة</button>
+      </div>
+      <div id="paymentsList"></div>
+
+      <div class="totals-box">
+        <div class="line"><span>إجمالي المدفوع</span><span id="mPaid">0</span></div>
         <div class="line remain"><span>المتبقي عليه</span><span id="mRemaining">0</span></div>
       </div>
 
@@ -457,12 +559,29 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- ===== MERCHANT STATEMENT MODAL ===== -->
+<div class="overlay" id="statementModalOverlay">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-head">
+      <h3 id="statementTitle">كشف حساب تاجر</h3>
+      <button class="icon-btn" onclick="closeModal('statementModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body" id="statementBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" onclick="printStatement()">🖨 طباعة</button>
+      <button class="btn btn-outline" onclick="closeModal('statementModalOverlay')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ===================== STATE ===================== */
 let db = null;
-let items = [];      // {id, name, color, piecesCount, price, stockQty}
-let merchantTxs = []; // {id, merchantName, phone, date, items:[{itemId,itemName,color,qty,unitPrice,subtotal}], total, paid, remaining, notes}
+let items = [];      // {id, name, color, piecesCount, price, stockQty, alertThreshold}
+let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
+let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
+let paymentRowCount = 0;
 
 /* ===================== FIREBASE INIT ===================== */
 // إعدادات المشروع مثبّتة هنا حتى يتصل التطبيق تلقائياً لأي شخص يفتحه، بدون الحاجة لإدخالها كل مرة.
@@ -492,6 +611,7 @@ function initFirebaseWithConfig(config){
     switchView('dashboard');
     listenToItems();
     listenToMerchantTxs();
+    listenToStockMovements();
   }catch(e){
     showToast('خطأ في إعداد Firebase: ' + e.message);
     setConnStatus(false);
@@ -534,6 +654,8 @@ function switchView(name){
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
   if(name==='dashboard') renderDashboard();
+  if(name==='remaining') renderRemainingStock();
+  if(name==='movements') renderMovements();
 }
 
 /* ===================== TOAST ===================== */
@@ -542,6 +664,62 @@ function showToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+/* ===================== NOTIFICATIONS ===================== */
+function toggleNotifPanel(){
+  document.getElementById('notifPanel').classList.toggle('active');
+}
+function closeNotifPanel(){
+  document.getElementById('notifPanel').classList.remove('active');
+}
+document.addEventListener('click', (e)=>{
+  const bell = document.getElementById('notifBell');
+  if(bell && !bell.contains(e.target)) closeNotifPanel();
+});
+
+function getAlertThreshold(item){
+  const t = item.alertThreshold;
+  if(t===null || t===undefined || t==='') return Math.max(2, Math.round((Number(item.stockQty)||0)*0.1));
+  return Number(t);
+}
+function getLowStockItems(){
+  return items.filter(i=> remainingQtyFor(i) <= getAlertThreshold(i));
+}
+function isOverdue(tx){
+  if(!tx.dueDate || Number(tx.remaining)<=0) return false;
+  const today = new Date().toISOString().slice(0,10);
+  return tx.dueDate < today;
+}
+function getOverdueTxs(){
+  return merchantTxs.filter(isOverdue);
+}
+function updateNotifications(){
+  const badge = document.getElementById('notifBadge');
+  const panel = document.getElementById('notifPanel');
+  if(!badge || !panel) return;
+
+  const low = getLowStockItems();
+  const overdue = getOverdueTxs();
+  const count = low.length + overdue.length;
+
+  badge.textContent = count;
+  badge.classList.toggle('show', count>0);
+
+  if(count===0){
+    panel.innerHTML = `<div class="notif-empty">لا توجد تنبيهات حالياً 👍</div>`;
+    return;
+  }
+  let html = '';
+  if(low.length){
+    html += `<div class="notif-section-title">📦 أصناف قاربت على النفاد</div>`;
+    html += low.map(i=>`<div class="notif-item" onclick="switchView('remaining'); closeNotifPanel();">${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''} — متبقي ${fmt(remainingQtyFor(i))}</div>`).join('');
+  }
+  if(overdue.length){
+    html += `<div class="notif-section-title">⚠️ دفعات متأخرة</div>`;
+    html += overdue.map(t=>`<div class="notif-item" onclick="switchView('merchants'); closeNotifPanel();">${escapeHtml(t.merchantName)} — متبقي ${fmt(t.remaining)} (استحق ${t.dueDate})</div>`).join('');
+  }
+  panel.innerHTML = html;
 }
 
 /* ===================== HELPERS ===================== */
@@ -569,7 +747,9 @@ function listenToItems(){
     snap.forEach(doc=> items.push({id: doc.id, ...doc.data()}));
     renderItems();
     renderDashboard();
+    renderRemainingStock();
     populateMerchantItemSelects();
+    updateNotifications();
   }, err=>{ showToast('خطأ في قراءة الأصناف: '+err.message); setConnStatus(false); });
 }
 
@@ -581,6 +761,7 @@ function openItemModal(item){
   document.getElementById('itemPieces').value = item ? item.piecesCount : 3;
   document.getElementById('itemPrice').value = item ? item.price : '';
   document.getElementById('itemStock').value = item ? item.stockQty : 0;
+  document.getElementById('itemAlertThreshold').value = (item && item.alertThreshold!==null && item.alertThreshold!==undefined) ? item.alertThreshold : '';
   document.getElementById('itemModalOverlay').classList.add('active');
 }
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
@@ -592,19 +773,35 @@ function saveItem(){
   const piecesCount = Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
   const stockQty = Number(document.getElementById('itemStock').value)||0;
+  const alertThresholdRaw = document.getElementById('itemAlertThreshold').value;
+  const alertThreshold = alertThresholdRaw==='' ? null : Number(alertThresholdRaw);
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
-  const payload = { name, color, piecesCount, price, stockQty };
+  const payload = { name, color, piecesCount, price, stockQty, alertThreshold };
+  const today = new Date().toISOString().slice(0,10);
 
   if(id){
+    const oldItem = items.find(i=>i.id===id);
+    const oldStock = oldItem ? (Number(oldItem.stockQty)||0) : 0;
+    const delta = stockQty - oldStock;
     db.collection('items').doc(id).update(payload)
-      .then(()=>{ showToast('تم تعديل الصنف'); closeModal('itemModalOverlay'); })
+      .then(()=>{
+        if(delta !== 0){
+          logStockMovement({itemId:id, itemName:name, type: delta>0?'in':'out', qty: Math.abs(delta), date: today, note:'تعديل يدوي للكمية', sourceType:'manual', sourceId:id});
+        }
+        showToast('تم تعديل الصنف'); closeModal('itemModalOverlay');
+      })
       .catch(e=> showToast('خطأ: '+e.message));
   }else{
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('items').add(payload)
-      .then(()=>{ showToast('تمت إضافة الصنف'); closeModal('itemModalOverlay'); })
+      .then((ref)=>{
+        if(stockQty>0){
+          logStockMovement({itemId:ref.id, itemName:name, type:'in', qty: stockQty, date: today, note:'رصيد افتتاحي', sourceType:'manual', sourceId:ref.id});
+        }
+        showToast('تمت إضافة الصنف'); closeModal('itemModalOverlay');
+      })
       .catch(e=> showToast('خطأ: '+e.message));
   }
 }
@@ -625,7 +822,7 @@ function renderItems(){
   grid.innerHTML = items.map(item=>{
     const issued = issuedQtyFor(item.id);
     const remaining = remainingQtyFor(item);
-    const lowStock = remaining <= Math.max(2, Math.round((Number(item.stockQty)||0)*0.1));
+    const lowStock = remaining <= getAlertThreshold(item);
     return `
     <div class="item-card">
       <span class="badge">${item.piecesCount} قطع/طقم</span>
@@ -634,11 +831,34 @@ function renderItems(){
       <div class="row"><span>سعر الطقم</span><span>${fmt(item.price)}</span></div>
       <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
-      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>المتبقي</span><span>${fmt(remaining)}</span></div>
+      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>
       <div class="actions">
         <button class="btn btn-outline btn-sm" onclick='openItemModal(${JSON.stringify(item).replace(/'/g,"&apos;")})'>تعديل</button>
         <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}')">حذف</button>
       </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRemainingStock(){
+  const grid = document.getElementById('remainingList');
+  if(items.length===0){
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="big">📦</div>لا توجد أصناف بعد.</div>`;
+    return;
+  }
+  const sorted = [...items].sort((a,b)=> remainingQtyFor(a) - remainingQtyFor(b));
+  grid.innerHTML = sorted.map(item=>{
+    const remaining = remainingQtyFor(item);
+    const issued = issuedQtyFor(item.id);
+    const lowStock = remaining <= getAlertThreshold(item);
+    return `
+    <div class="item-card">
+      <span class="badge">${item.piecesCount} قطع/طقم</span>
+      <h3>${escapeHtml(item.name)}</h3>
+      <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
+      <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
+      <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
+      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>
     </div>`;
   }).join('');
 }
@@ -657,6 +877,51 @@ function escapeHtml(s){
   return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+/* ===================== STOCK MOVEMENTS: FIRESTORE ===================== */
+function logStockMovement({itemId, itemName, type, qty, date, note, sourceType, sourceId}){
+  if(!db) return;
+  db.collection('stockMovements').add({
+    itemId: itemId||'', itemName: itemName||'', type, qty: Number(qty)||0,
+    date: date || new Date().toISOString().slice(0,10),
+    note: note||'', sourceType: sourceType||'', sourceId: sourceId||'',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e=> console.error('movement log error', e));
+}
+
+function deleteMovementsBySource(sourceId){
+  if(!sourceId) return Promise.resolve();
+  return db.collection('stockMovements').where('sourceId','==',sourceId).get().then(snap=>{
+    const batch = db.batch();
+    snap.forEach(doc=> batch.delete(doc.ref));
+    return batch.commit();
+  });
+}
+
+function listenToStockMovements(){
+  db.collection('stockMovements').orderBy('date','desc').onSnapshot(snap=>{
+    stockMovements = [];
+    snap.forEach(doc=> stockMovements.push({id: doc.id, ...doc.data()}));
+    renderMovements();
+  }, err=> showToast('خطأ في قراءة سجل الحركة: '+err.message));
+}
+
+function renderMovements(){
+  const tbody = document.querySelector('#movementsTable tbody');
+  if(!tbody) return;
+  if(stockMovements.length===0){
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = stockMovements.map(m=>`
+    <tr>
+      <td>${m.date||''}</td>
+      <td>${escapeHtml(m.itemName)}</td>
+      <td>${m.type==='in' ? '<span class="pill paid">إضافة</span>' : '<span class="pill unpaid">خصم</span>'}</td>
+      <td class="money">${m.type==='in'?'+':'-'}${fmt(m.qty)}</td>
+      <td>${escapeHtml(m.note||'')}</td>
+    </tr>`).join('');
+}
+
 /* ===================== MERCHANTS: FIRESTORE ===================== */
 function listenToMerchantTxs(){
   db.collection('merchantTransactions').orderBy('date','desc').onSnapshot(snap=>{
@@ -665,6 +930,8 @@ function listenToMerchantTxs(){
     renderMerchants();
     renderDashboard();
     renderItems();
+    renderRemainingStock();
+    updateNotifications();
   }, err=>{ showToast('خطأ في قراءة بيانات التجار: '+err.message); });
 }
 
@@ -674,7 +941,7 @@ function openMerchantModal(tx){
   document.getElementById('merchantName').value = tx ? tx.merchantName : '';
   document.getElementById('merchantPhone').value = tx ? (tx.phone||'') : '';
   document.getElementById('merchantDate').value = tx ? tx.date : new Date().toISOString().slice(0,10);
-  document.getElementById('merchantPaid').value = tx ? tx.paid : 0;
+  document.getElementById('merchantDueDate').value = tx ? (tx.dueDate||'') : '';
   document.getElementById('merchantNotes').value = tx ? (tx.notes||'') : '';
 
   document.getElementById('merchantItemsList').innerHTML = '';
@@ -684,6 +951,16 @@ function openMerchantModal(tx){
   }else{
     addMerchantItemRow();
   }
+
+  document.getElementById('paymentsList').innerHTML = '';
+  paymentRowCount = 0;
+  if(tx && tx.payments && tx.payments.length){
+    tx.payments.forEach(p=> addPaymentRow(p));
+  }else if(tx && Number(tx.paid)>0){
+    // بيانات قديمة كانت تُسجَّل كدفعة واحدة بدون تاريخ منفصل — نحوّلها لأول دفعة مقدمة
+    addPaymentRow({date: tx.date, amount: tx.paid, note: 'دفعة مقدمة'});
+  }
+
   recalcMerchantTotals();
   document.getElementById('merchantModalOverlay').classList.add('active');
 }
@@ -749,9 +1026,49 @@ function recalcMerchantTotals(){
     row.querySelector('.merchant-item-subtotal').textContent = fmt(subtotal);
     total += subtotal;
   });
-  const paid = Number(document.getElementById('merchantPaid').value)||0;
+  const paid = getPaymentsTotal();
   document.getElementById('mTotal').textContent = fmt(total);
+  document.getElementById('mPaid').textContent = fmt(paid);
   document.getElementById('mRemaining').textContent = fmt(total-paid);
+}
+
+function getPaymentsTotal(){
+  let sum = 0;
+  document.querySelectorAll('.payment-row').forEach(row=>{
+    sum += Number(row.querySelector('.payment-amount').value)||0;
+  });
+  return sum;
+}
+
+function addPaymentRow(existing){
+  paymentRowCount++;
+  const rowId = 'pay_'+paymentRowCount;
+  const wrap = document.createElement('div');
+  wrap.className = 'payment-row';
+  wrap.id = rowId;
+  const dateVal = existing ? (existing.date||'') : new Date().toISOString().slice(0,10);
+  const amountVal = existing ? (existing.amount||0) : '';
+  const noteVal = existing ? (existing.note||'') : '';
+  wrap.innerHTML = `
+    <div>
+      <input type="date" class="payment-date" value="${dateVal}" oninput="recalcMerchantTotals()">
+    </div>
+    <div>
+      <input type="number" min="0" step="0.01" class="payment-amount" placeholder="المبلغ" value="${amountVal}" oninput="recalcMerchantTotals()">
+    </div>
+    <div>
+      <input type="text" class="payment-note" placeholder="ملاحظة (اختياري)" value="${escapeHtml(noteVal)}">
+    </div>
+    <button class="icon-btn" onclick="removePaymentRow('${rowId}')">🗑</button>
+  `;
+  document.getElementById('paymentsList').appendChild(wrap);
+  recalcMerchantTotals();
+}
+
+function removePaymentRow(rowId){
+  const el = document.getElementById(rowId);
+  if(el) el.remove();
+  recalcMerchantTotals();
 }
 
 function saveMerchantTx(){
@@ -759,8 +1076,8 @@ function saveMerchantTx(){
   const merchantName = document.getElementById('merchantName').value.trim();
   const phone = document.getElementById('merchantPhone').value.trim();
   const date = document.getElementById('merchantDate').value || new Date().toISOString().slice(0,10);
+  const dueDate = document.getElementById('merchantDueDate').value || '';
   const notes = document.getElementById('merchantNotes').value.trim();
-  const paid = Number(document.getElementById('merchantPaid').value)||0;
 
   if(!merchantName){ showToast('من فضلك أدخل اسم التاجر'); return; }
 
@@ -783,19 +1100,43 @@ function saveMerchantTx(){
   }
   if(txItems.length===0){ showToast('أضف صنفاً واحداً على الأقل بكمية صحيحة'); return; }
 
+  const payments = [];
+  document.querySelectorAll('.payment-row').forEach(row=>{
+    const pDate = row.querySelector('.payment-date').value || date;
+    const pAmount = Number(row.querySelector('.payment-amount').value)||0;
+    const pNote = row.querySelector('.payment-note').value.trim();
+    if(pAmount>0) payments.push({date: pDate, amount: pAmount, note: pNote});
+  });
+  const paid = payments.reduce((s,p)=> s + p.amount, 0);
+
   const payload = {
-    merchantName, phone, date, notes,
-    items: txItems, total, paid, remaining: total-paid
+    merchantName, phone, date, dueDate, notes,
+    items: txItems, total, payments, paid, remaining: total-paid
   };
 
+  function logIssuedMovements(sourceId){
+    txItems.forEach(it=> logStockMovement({
+      itemId: it.itemId, itemName: it.itemName, type:'out', qty: it.qty, date,
+      note: 'صرف للتاجر: '+merchantName, sourceType:'merchant', sourceId
+    }));
+  }
+
   if(id){
-    db.collection('merchantTransactions').doc(id).update(payload)
-      .then(()=>{ showToast('تم تعديل العملية'); closeModal('merchantModalOverlay'); })
-      .catch(e=> showToast('خطأ: '+e.message));
+    deleteMovementsBySource(id).then(()=>{
+      db.collection('merchantTransactions').doc(id).update(payload)
+        .then(()=>{
+          logIssuedMovements(id);
+          showToast('تم تعديل العملية'); closeModal('merchantModalOverlay');
+        })
+        .catch(e=> showToast('خطأ: '+e.message));
+    });
   }else{
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('merchantTransactions').add(payload)
-      .then(()=>{ showToast('تم حفظ العملية'); closeModal('merchantModalOverlay'); })
+      .then((ref)=>{
+        logIssuedMovements(ref.id);
+        showToast('تم حفظ العملية'); closeModal('merchantModalOverlay');
+      })
       .catch(e=> showToast('خطأ: '+e.message));
   }
 }
@@ -803,45 +1144,125 @@ function saveMerchantTx(){
 function deleteMerchantTx(id){
   if(!confirm('هل تريد حذف هذه العملية نهائياً؟')) return;
   db.collection('merchantTransactions').doc(id).delete()
-    .then(()=> showToast('تم الحذف'))
+    .then(()=>{
+      deleteMovementsBySource(id);
+      showToast('تم الحذف');
+    })
     .catch(e=> showToast('خطأ: '+e.message));
 }
 
 function paymentPillClass(tx){
+  if(isOverdue(tx)) return 'overdue';
   if(tx.remaining<=0) return 'paid';
   if(tx.paid>0) return 'partial';
   return 'unpaid';
 }
 function paymentPillLabel(tx){
+  if(isOverdue(tx)) return 'متأخر السداد';
   if(tx.remaining<=0) return 'مدفوع بالكامل';
   if(tx.paid>0) return 'مدفوع جزئياً';
   return 'غير مدفوع';
 }
 
 function renderMerchants(){
-  const tbody = document.querySelector('#merchantsTable tbody');
-  if(merchantTxs.length===0){
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="big">🤝</div>لا توجد عمليات تجار بعد.</div></td></tr>`;
+  const box = document.getElementById('merchantsCards');
+
+  const nameFilter = (document.getElementById('filterMerchantName')?.value||'').trim().toLowerCase();
+  const statusFilter = document.getElementById('filterMerchantStatus')?.value||'';
+  const fromFilter = document.getElementById('filterMerchantFrom')?.value||'';
+  const toFilter = document.getElementById('filterMerchantTo')?.value||'';
+
+  const filtered = merchantTxs.filter(tx=>{
+    if(nameFilter && !(tx.merchantName||'').toLowerCase().includes(nameFilter)) return false;
+    if(fromFilter && tx.date && tx.date < fromFilter) return false;
+    if(toFilter && tx.date && tx.date > toFilter) return false;
+    if(statusFilter){
+      if(statusFilter==='overdue'){ if(!isOverdue(tx)) return false; }
+      else if(paymentPillClass(tx) !== statusFilter) return false;
+    }
+    return true;
+  });
+
+  if(filtered.length===0){
+    box.innerHTML = `<div class="card"><div class="empty"><div class="big">🤝</div>${merchantTxs.length===0?'لا توجد عمليات تجار بعد.':'لا توجد عمليات مطابقة لبحثك.'}</div></div>`;
     return;
   }
-  tbody.innerHTML = merchantTxs.map(tx=>`
-    <tr>
-      <td>${escapeHtml(tx.merchantName)}${tx.phone? '<br><span class="sub" style="color:var(--muted);font-size:11.5px;">'+escapeHtml(tx.phone)+'</span>':''}</td>
-      <td>${tx.date||''}</td>
-      <td>${(tx.items||[]).length}</td>
-      <td class="money">${fmt(tx.total)}</td>
-      <td class="money">${fmt(tx.paid)}</td>
-      <td class="money">${fmt(tx.remaining)}</td>
-      <td><span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span></td>
-      <td>
-        <button class="icon-btn" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️</button>
-        <button class="icon-btn" onclick="deleteMerchantTx('${tx.id}')">🗑</button>
-      </td>
-    </tr>
+  box.innerHTML = filtered.map(tx=>`
+    <div class="merchant-card">
+      <div class="merchant-card-head">
+        <div>
+          <h3>${escapeHtml(tx.merchantName)}</h3>
+          ${tx.phone? '<div class="phone">'+escapeHtml(tx.phone)+'</div>':''}
+        </div>
+        <span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span>
+      </div>
+      <div class="m-row"><span>التاريخ</span><span>${tx.date||''}</span></div>
+      ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${tx.dueDate}</span></div>`:''}
+      <div class="m-row"><span>عدد الأصناف</span><span>${(tx.items||[]).length}</span></div>
+      <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
+      <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
+      <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
+        <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
+      </div>
+    </div>
   `).join('');
 }
 
-/* ===================== DASHBOARD ===================== */
+/* ===================== MERCHANT STATEMENT ===================== */
+function openStatementModal(merchantName){
+  const txs = merchantTxs.filter(t=> t.merchantName === merchantName).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  if(txs.length===0){ showToast('لا توجد عمليات لهذا التاجر'); return; }
+
+  const totalAll = txs.reduce((s,t)=> s+(Number(t.total)||0), 0);
+  const paidAll = txs.reduce((s,t)=> s+(Number(t.paid)||0), 0);
+  const remainingAll = totalAll - paidAll;
+  const phone = txs.find(t=>t.phone)?.phone || '';
+
+  const allPayments = [];
+  txs.forEach(t=> (t.payments||[]).forEach(p=> allPayments.push(p)));
+  allPayments.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+
+  document.getElementById('statementTitle').textContent = 'كشف حساب: ' + merchantName;
+  document.getElementById('statementBody').innerHTML = `
+    <div id="statementPrintArea">
+      <h2 style="margin-bottom:4px;">${escapeHtml(merchantName)}</h2>
+      ${phone? `<p class="page-sub" style="margin-bottom:14px;">${escapeHtml(phone)}</p>`:'<div style="margin-bottom:14px;"></div>'}
+
+      <div class="section-head" style="margin:10px 0 8px;"><h2 style="font-size:14px;">العمليات</h2></div>
+      <table>
+        <thead><tr><th>التاريخ</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+        <tbody>
+          ${txs.map(t=>`<tr><td>${t.date||''}</td><td>${(t.items||[]).length}</td><td class="money">${fmt(t.total)}</td><td class="money">${fmt(t.paid)}</td><td class="money">${fmt(t.remaining)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+
+      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">الدفعات</h2></div>
+      <table>
+        <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th></tr></thead>
+        <tbody>
+          ${allPayments.length ? allPayments.map(p=>`<tr><td>${p.date||''}</td><td class="money">${fmt(p.amount)}</td><td>${escapeHtml(p.note||'')}</td></tr>`).join('') : '<tr><td colspan="3"><div class="empty">لا توجد دفعات مسجلة.</div></td></tr>'}
+        </tbody>
+      </table>
+
+      <div class="totals-box" style="margin-top:18px;">
+        <div class="line big"><span>إجمالي كل العمليات</span><span>${fmt(totalAll)}</span></div>
+        <div class="line"><span>إجمالي المدفوع</span><span>${fmt(paidAll)}</span></div>
+        <div class="line remain"><span>المتبقي الإجمالي</span><span>${fmt(remainingAll)}</span></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('statementModalOverlay').classList.add('active');
+}
+
+function printStatement(){
+  document.body.classList.add('printing-statement');
+  window.print();
+  setTimeout(()=> document.body.classList.remove('printing-statement'), 300);
+}
+
 function renderDashboard(){
   document.getElementById('statItemsCount').textContent = fmt(items.length);
   const totalStock = items.reduce((s,i)=> s + (Number(i.stockQty)||0), 0);
@@ -856,10 +1277,7 @@ function renderDashboard(){
   document.getElementById('statStockValue').textContent = fmt(stockValue);
   document.getElementById('statReceivables').textContent = fmt(receivables);
 
-  const low = items.filter(i=>{
-    const rem = remainingQtyFor(i);
-    return rem <= Math.max(2, Math.round((Number(i.stockQty)||0)*0.1));
-  });
+  const low = items.filter(i=> remainingQtyFor(i) <= getAlertThreshold(i));
   const lowBox = document.getElementById('lowStockList');
   lowBox.innerHTML = low.length ? low.map(i=>`
     <div class="totals-box" style="margin-bottom:8px;">
