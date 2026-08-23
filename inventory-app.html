@@ -330,6 +330,7 @@
   <button data-view="remaining">المخزون المتبقي</button>
   <button data-view="movements">سجل الحركة</button>
   <button data-view="merchants">التجار</button>
+  <button data-view="archived">المعاملات المنتهية</button>
 </nav>
 
 <main>
@@ -448,6 +449,17 @@
       <button class="btn btn-gold" onclick="openMerchantModal()">+ عملية جديدة</button>
     </div>
     <div id="merchantsCards"></div>
+  </div>
+
+  <!-- ========== ARCHIVED (COMPLETED) TRANSACTIONS VIEW ========== -->
+  <div id="view-archived" class="view">
+    <div class="section-head" style="margin-top:0;">
+      <div>
+        <div class="page-title">المعاملات المنتهية</div>
+        <div class="page-sub">سجل بمعاملات التجار التي تم سداد مديونيتها بالكامل وحذفها من القائمة النشطة</div>
+      </div>
+    </div>
+    <div id="archivedCards"></div>
   </div>
 
 
@@ -579,6 +591,7 @@
 let db = null;
 let items = [];      // {id, name, color, piecesCount, price, stockQty, alertThreshold}
 let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
+let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
 let paymentRowCount = 0;
@@ -611,6 +624,7 @@ function initFirebaseWithConfig(config){
     switchView('dashboard');
     listenToItems();
     listenToMerchantTxs();
+    listenToArchivedMerchantTxs();
     listenToStockMovements();
   }catch(e){
     showToast('خطأ في إعداد Firebase: ' + e.message);
@@ -656,6 +670,7 @@ function switchView(name){
   if(name==='dashboard') renderDashboard();
   if(name==='remaining') renderRemainingStock();
   if(name==='movements') renderMovements();
+  if(name==='archived') renderArchived();
 }
 
 /* ===================== TOAST ===================== */
@@ -941,6 +956,94 @@ function listenToMerchantTxs(){
   }, err=>{ showToast('خطأ في قراءة بيانات التجار: '+err.message); });
 }
 
+function listenToArchivedMerchantTxs(){
+  db.collection('archivedMerchantTransactions').orderBy('archivedAt','desc').onSnapshot(snap=>{
+    archivedMerchantTxs = [];
+    snap.forEach(doc=> archivedMerchantTxs.push({id: doc.id, ...doc.data()}));
+    renderArchived();
+  }, err=>{ showToast('خطأ في قراءة المعاملات المنتهية: '+err.message); });
+}
+
+function renderArchived(){
+  const box = document.getElementById('archivedCards');
+  if(!box) return;
+  if(archivedMerchantTxs.length===0){
+    box.innerHTML = `<div class="card"><div class="empty"><div class="big">🗄️</div>لا توجد معاملات منتهية بعد.</div></div>`;
+    return;
+  }
+  box.innerHTML = archivedMerchantTxs.map(tx=>{
+    const archivedDate = tx.archivedAt && tx.archivedAt.toDate ? tx.archivedAt.toDate().toISOString().slice(0,10) : '';
+    return `
+    <div class="merchant-card">
+      <div class="merchant-card-head">
+        <div>
+          <h3>${escapeHtml(tx.merchantName)}</h3>
+          ${tx.phone? '<div class="phone"><a href="tel:'+escapeHtml(tx.phone)+'" style="color:inherit; text-decoration:none;">📞 '+escapeHtml(tx.phone)+'</a></div>':''}
+        </div>
+        <span class="pill paid">منتهية</span>
+      </div>
+      <div class="m-row"><span>تاريخ العملية</span><span>${fmtDate(tx.date)}</span></div>
+      ${archivedDate? `<div class="m-row"><span>تاريخ الأرشفة</span><span>${fmtDate(archivedDate)}</span></div>`:''}
+      <div class="m-row"><span>عدد الأصناف</span><span>${(tx.items||[]).length}</span></div>
+      <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
+      <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick='openArchivedStatementModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>📄 عرض التفاصيل</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteArchivedMerchantTx('${tx.id}')">🗑 حذف نهائي</button>
+      </div>
+    </div>
+  `;}).join('');
+}
+
+function deleteArchivedMerchantTx(id){
+  if(!confirm('هل تريد حذف هذه المعاملة نهائياً من السجل؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+  db.collection('archivedMerchantTransactions').doc(id).delete()
+    .then(()=> showToast('تم الحذف النهائي'))
+    .catch(e=> showToast('خطأ: '+e.message));
+}
+
+function openArchivedStatementModal(tx){
+  const itemsAgg = {};
+  (tx.items||[]).forEach(it=>{
+    const key = (it.itemName||'') + '||' + (it.color||'');
+    if(!itemsAgg[key]) itemsAgg[key] = {itemName: it.itemName||'', color: it.color||'', qty:0, subtotal:0};
+    itemsAgg[key].qty += Number(it.qty)||0;
+    itemsAgg[key].subtotal += Number(it.subtotal)||0;
+  });
+  const itemsAggList = Object.values(itemsAgg).sort((a,b)=> b.qty - a.qty);
+  const payments = (tx.payments||[]).slice().sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+
+  document.getElementById('statementTitle').textContent = 'معاملة منتهية: ' + tx.merchantName;
+  document.getElementById('statementBody').innerHTML = `
+    <div id="statementPrintArea">
+      <h2 style="margin-bottom:4px;">${escapeHtml(tx.merchantName)}</h2>
+      ${tx.phone? `<p class="page-sub" style="margin-bottom:14px;"><a href="tel:${escapeHtml(tx.phone)}" style="color:inherit; text-decoration:none;">📞 ${escapeHtml(tx.phone)}</a></p>`:'<div style="margin-bottom:14px;"></div>'}
+
+      <div class="section-head" style="margin:10px 0 8px;"><h2 style="font-size:14px;">الأصناف المشتراة</h2></div>
+      <table>
+        <thead><tr><th>الصنف</th><th>اللون</th><th>عدد الوحدات</th><th>الإجمالي</th></tr></thead>
+        <tbody>
+          ${itemsAggList.length ? itemsAggList.map(a=>`<tr><td>${escapeHtml(a.itemName)}</td><td>${escapeHtml(a.color||'-')}</td><td class="money">${fmt(a.qty)}</td><td class="money">${fmt(a.subtotal)}</td></tr>`).join('') : '<tr><td colspan="4"><div class="empty">لا توجد أصناف.</div></td></tr>'}
+        </tbody>
+      </table>
+
+      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">الدفعات</h2></div>
+      <table>
+        <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th></tr></thead>
+        <tbody>
+          ${payments.length ? payments.map(p=>`<tr><td>${fmtDate(p.date)}</td><td class="money">${fmt(p.amount)}</td><td>${escapeHtml(p.note||'')}</td></tr>`).join('') : '<tr><td colspan="3"><div class="empty">لا توجد دفعات مسجلة.</div></td></tr>'}
+        </tbody>
+      </table>
+
+      <div class="totals-box" style="margin-top:18px;">
+        <div class="line big"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
+        <div class="line"><span>إجمالي المدفوع</span><span>${fmt(tx.paid)}</span></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('statementModalOverlay').classList.add('active');
+}
+
 function openMerchantModal(tx){
   document.getElementById('merchantModalTitle').textContent = tx ? 'تعديل العملية' : 'عملية تاجر جديدة';
   document.getElementById('merchantTxId').value = tx ? tx.id : '';
@@ -1148,13 +1251,27 @@ function saveMerchantTx(){
 }
 
 function deleteMerchantTx(id){
-  if(!confirm('هل تريد حذف هذه العملية نهائياً؟')) return;
-  db.collection('merchantTransactions').doc(id).delete()
-    .then(()=>{
-      deleteMovementsBySource(id);
-      showToast('تم الحذف');
-    })
-    .catch(e=> showToast('خطأ: '+e.message));
+  if(!confirm('هل تريد حذف هذه العملية؟ سيتم نقلها إلى سجل المعاملات المنتهية.')) return;
+  const tx = merchantTxs.find(t=> t.id === id);
+  const finishDelete = ()=>{
+    db.collection('merchantTransactions').doc(id).delete()
+      .then(()=>{
+        deleteMovementsBySource(id);
+        showToast('تم الحذف ونقل المعاملة لسجل المعاملات المنتهية');
+      })
+      .catch(e=> showToast('خطأ: '+e.message));
+  };
+  if(tx){
+    const { id: _oldId, ...txData } = tx;
+    db.collection('archivedMerchantTransactions').add({
+      ...txData,
+      originalId: id,
+      archivedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(finishDelete)
+      .catch(e=> showToast('خطأ أثناء أرشفة المعاملة: '+e.message));
+  } else {
+    finishDelete();
+  }
 }
 
 function paymentPillClass(tx){
