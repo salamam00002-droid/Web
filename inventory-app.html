@@ -1225,6 +1225,15 @@ function openStatementModal(merchantName){
   txs.forEach(t=> (t.payments||[]).forEach(p=> allPayments.push(p)));
   allPayments.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
 
+  const itemsAgg = {};
+  txs.forEach(t=> (t.items||[]).forEach(it=>{
+    const key = (it.itemName||'') + '||' + (it.color||'');
+    if(!itemsAgg[key]) itemsAgg[key] = {itemName: it.itemName||'', color: it.color||'', qty:0, subtotal:0};
+    itemsAgg[key].qty += Number(it.qty)||0;
+    itemsAgg[key].subtotal += Number(it.subtotal)||0;
+  }));
+  const itemsAggList = Object.values(itemsAgg).sort((a,b)=> b.qty - a.qty);
+
   document.getElementById('statementTitle').textContent = 'كشف حساب: ' + merchantName;
   document.getElementById('statementBody').innerHTML = `
     <div id="statementPrintArea">
@@ -1236,6 +1245,14 @@ function openStatementModal(merchantName){
         <thead><tr><th>التاريخ</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
         <tbody>
           ${txs.map(t=>`<tr><td>${t.date||''}</td><td>${(t.items||[]).length}</td><td class="money">${fmt(t.total)}</td><td class="money">${fmt(t.paid)}</td><td class="money">${fmt(t.remaining)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+
+      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">الأصناف المشتراة</h2></div>
+      <table>
+        <thead><tr><th>الصنف</th><th>اللون</th><th>عدد الوحدات</th><th>الإجمالي</th></tr></thead>
+        <tbody>
+          ${itemsAggList.length ? itemsAggList.map(a=>`<tr><td>${escapeHtml(a.itemName)}</td><td>${escapeHtml(a.color||'-')}</td><td class="money">${fmt(a.qty)}</td><td class="money">${fmt(a.subtotal)}</td></tr>`).join('') : '<tr><td colspan="4"><div class="empty">لا توجد أصناف.</div></td></tr>'}
         </tbody>
       </table>
 
