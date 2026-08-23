@@ -1251,27 +1251,37 @@ function saveMerchantTx(){
 }
 
 function deleteMerchantTx(id){
-  if(!confirm('هل تريد حذف هذه العملية؟ سيتم نقلها إلى سجل المعاملات المنتهية.')) return;
+  if(!confirm('هل تريد إنهاء هذه العملية؟ سيتم نقلها إلى سجل المعاملات المنتهية وخصم كمياتها نهائياً من المخزون.')) return;
   const tx = merchantTxs.find(t=> t.id === id);
-  const finishDelete = ()=>{
-    db.collection('merchantTransactions').doc(id).delete()
-      .then(()=>{
-        deleteMovementsBySource(id);
-        showToast('تم الحذف ونقل المعاملة لسجل المعاملات المنتهية');
-      })
-      .catch(e=> showToast('خطأ: '+e.message));
-  };
-  if(tx){
-    const { id: _oldId, ...txData } = tx;
-    db.collection('archivedMerchantTransactions').add({
-      ...txData,
-      originalId: id,
-      archivedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(finishDelete)
-      .catch(e=> showToast('خطأ أثناء أرشفة المعاملة: '+e.message));
-  } else {
-    finishDelete();
-  }
+  if(!tx){ showToast('تعذر إيجاد العملية'); return; }
+
+  const { id: _oldId, ...txData } = tx;
+  const batch = db.batch();
+
+  // خصم الكميات نهائياً من رصيد كل صنف، بدل الاعتماد على بقاء المعاملة ضمن "النشطة"
+  // لأن issuedQtyFor() يحسب فقط المعاملات النشطة، فحذف/أرشفة المعاملة كان بيرجّع
+  // "المتبقي" لأعلى وكأن الكمية عادت للمخزن رغم إنها خرجت فعلياً للتاجر.
+  (tx.items||[]).forEach(it=>{
+    if(!it.itemId || !it.qty) return;
+    const itemRef = db.collection('items').doc(it.itemId);
+    batch.update(itemRef, { stockQty: firebase.firestore.FieldValue.increment(-Number(it.qty)||0) });
+  });
+
+  const archiveRef = db.collection('archivedMerchantTransactions').doc();
+  batch.set(archiveRef, {
+    ...txData,
+    originalId: id,
+    archivedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  batch.delete(db.collection('merchantTransactions').doc(id));
+
+  batch.commit()
+    .then(()=>{
+      // لا نحذف سجلات stockMovements الخاصة بالمعاملة، لأنها تمثل تاريخ الصرف الفعلي وتظل صحيحة
+      showToast('تم إنهاء العملية ونقلها للسجل، وتم خصم الكمية نهائياً من المخزون');
+    })
+    .catch(e=> showToast('خطأ: '+e.message));
 }
 
 function paymentPillClass(tx){
