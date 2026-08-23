@@ -471,9 +471,21 @@ let merchantTxs = []; // {id, merchantName, phone, date, items:[{itemId,itemName
 let merchantItemRowCount = 0;
 
 /* ===================== FIREBASE INIT ===================== */
+// إعدادات المشروع مثبّتة هنا حتى يتصل التطبيق تلقائياً لأي شخص يفتحه، بدون الحاجة لإدخالها كل مرة.
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAHnAeKyH_sZEQtkcYsXAUp2DodpA_0TZw",
+  authDomain: "inventory-935d5.firebaseapp.com",
+  projectId: "inventory-935d5",
+  storageBucket: "inventory-935d5.firebasestorage.app",
+  messagingSenderId: "1008510500001",
+  appId: "1:1008510500001:web:a150d19ee24de4025f04e0"
+};
+
 function loadStoredConfig(){
   const raw = localStorage.getItem('invapp_firebase_config');
-  return raw ? JSON.parse(raw) : null;
+  if(raw) return JSON.parse(raw);
+  if(DEFAULT_FIREBASE_CONFIG.apiKey) return DEFAULT_FIREBASE_CONFIG;
+  return null;
 }
 
 function initFirebaseWithConfig(config){
@@ -511,7 +523,10 @@ function saveFirebaseConfig(){
 }
 
 function disconnectFirebase(){
-  if(!confirm('سيتم قطع الاتصال بهذا المشروع (بياناتك تبقى محفوظة في Firebase). متابعة؟')) return;
+  const msg = DEFAULT_FIREBASE_CONFIG.apiKey
+    ? 'هذا التطبيق مضبوط على مشروع Firebase ثابت داخل الملف نفسه، لذلك سيعود الاتصال به تلقائياً بعد إعادة التحميل. لتغييره فعلياً، عدّل القيم داخل كود الملف. متابعة؟'
+    : 'سيتم قطع الاتصال بهذا المشروع (بياناتك تبقى محفوظة في Firebase). متابعة؟';
+  if(!confirm(msg)) return;
   localStorage.removeItem('invapp_firebase_config');
   location.reload();
 }
