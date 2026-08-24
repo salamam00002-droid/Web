@@ -253,16 +253,52 @@
   .modal-body{padding:20px 22px;}
   .modal-foot{padding:16px 22px; border-top:1px solid var(--line); display:flex; gap:10px; justify-content:flex-start;}
 
+  /* ---------- item image ---------- */
+  .img-upload-row{display:flex; align-items:center; gap:14px; margin-bottom:6px;}
+  .img-preview{
+    width:76px; height:76px; border-radius:10px; border:1px dashed var(--line);
+    background:var(--cream) center/cover no-repeat; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:11px; text-align:center; flex-shrink:0; overflow:hidden;
+  }
+  .img-upload-actions{display:flex; flex-direction:column; gap:6px;}
+  .item-card .thumb{
+    width:100%; height:120px; border-radius:10px; overflow:hidden; margin-bottom:10px;
+    background:var(--cream); cursor:zoom-in; border:1px solid var(--line);
+  }
+  .item-card .thumb img{width:100%; height:100%; object-fit:cover; display:block; transition:.15s;}
+  .item-card .thumb:hover img{opacity:.88;}
+
+  .lightbox-overlay{
+    position:fixed; inset:0; background:rgba(15,20,35,.92); display:none;
+    align-items:center; justify-content:center; z-index:400; padding:24px; cursor:zoom-out;
+  }
+  .lightbox-overlay.active{display:flex;}
+  .lightbox-overlay img{max-width:100%; max-height:88vh; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .lightbox-close{
+    position:absolute; top:18px; inset-inline-end:22px; background:rgba(255,255,255,.12); color:#fff;
+    border:none; width:38px; height:38px; border-radius:50%; font-size:18px; cursor:pointer;
+  }
+  .lightbox-caption{
+    position:absolute; bottom:22px; color:#fff; font-size:13px; background:rgba(0,0,0,.4);
+    padding:6px 14px; border-radius:20px;
+  }
+
   .empty{
     text-align:center; padding:50px 20px; color:var(--muted);
   }
   .empty .big{font-size:38px; margin-bottom:10px;}
 
   .merchant-item-row{
-    display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:8px; align-items:center;
+    display:grid; grid-template-columns:auto 2fr 1fr 1fr 1fr auto; gap:8px; align-items:center;
     padding:8px 0; border-bottom:1px dashed var(--line);
   }
   .merchant-item-row .sub{font-size:11.5px; color:var(--muted);}
+  .merchant-item-thumb{
+    width:40px; height:40px; border-radius:8px; background:var(--cream) center/cover no-repeat;
+    border:1px solid var(--line); flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    font-size:15px; color:var(--muted);
+  }
+  .merchant-item-thumb.has-img{cursor:zoom-in;}
 
   .payment-row{
     display:grid; grid-template-columns:1fr 1fr 1.2fr auto; gap:8px; align-items:center;
@@ -296,7 +332,7 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
   @media(max-width:640px){
-    .merchant-item-row{grid-template-columns:1fr 1fr; }
+    .merchant-item-row{grid-template-columns:auto 1fr 1fr; }
     header{padding:14px 16px;}
   }
 
@@ -485,6 +521,17 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="itemId">
+      <input type="hidden" id="itemImageData">
+      <div class="field">
+        <label>صورة الصنف</label>
+        <div class="img-upload-row">
+          <div class="img-preview" id="itemImagePreview" onclick="if(document.getElementById('itemImageData').value) openLightbox(document.getElementById('itemImageData').value, document.getElementById('itemName').value)">لا توجد صورة</div>
+          <div class="img-upload-actions">
+            <input type="file" id="itemImageFile" accept="image/*" onchange="handleItemImageChange(event)">
+            <button type="button" class="btn btn-outline btn-sm" id="removeItemImageBtn" style="display:none;" onclick="removeItemImage()">إزالة الصورة</button>
+          </div>
+        </div>
+      </div>
       <div class="field">
         <label>اسم الصنف</label>
         <input id="itemName" placeholder="مثال: طقم شنط سفر موديل A">
@@ -517,6 +564,13 @@
       <button class="btn btn-outline" onclick="closeModal('itemModalOverlay')">إلغاء</button>
     </div>
   </div>
+</div>
+
+<!-- ===== IMAGE LIGHTBOX ===== -->
+<div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox(event)">✕</button>
+  <img id="lightboxImg" src="" alt="">
+  <div class="lightbox-caption" id="lightboxCaption"></div>
 </div>
 
 <!-- ===== MERCHANT MODAL ===== -->
@@ -794,9 +848,66 @@ function openItemModal(item){
   document.getElementById('itemPrice').value = item ? item.price : '';
   document.getElementById('itemStock').value = item ? item.stockQty : 0;
   document.getElementById('itemAlertThreshold').value = (item && item.alertThreshold!==null && item.alertThreshold!==undefined) ? item.alertThreshold : '';
+  document.getElementById('itemImageFile').value = '';
+  setItemImagePreview(item && item.image ? item.image : '');
   document.getElementById('itemModalOverlay').classList.add('active');
 }
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+
+/* ===================== ITEM IMAGE (upload + resize + preview) ===================== */
+function setItemImagePreview(dataUrl){
+  document.getElementById('itemImageData').value = dataUrl || '';
+  const preview = document.getElementById('itemImagePreview');
+  const removeBtn = document.getElementById('removeItemImageBtn');
+  if(dataUrl){
+    preview.style.backgroundImage = `url('${dataUrl}')`;
+    preview.textContent = '';
+    removeBtn.style.display = 'inline-block';
+  }else{
+    preview.style.backgroundImage = '';
+    preview.textContent = 'لا توجد صورة';
+    removeBtn.style.display = 'none';
+  }
+}
+function removeItemImage(){
+  document.getElementById('itemImageFile').value = '';
+  setItemImagePreview('');
+}
+function handleItemImageChange(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ showToast('من فضلك اختر ملف صورة'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxDim = 900;
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        if(w >= h){ h = Math.round(h * (maxDim/w)); w = maxDim; }
+        else{ w = Math.round(w * (maxDim/h)); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      setItemImagePreview(dataUrl);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function openLightbox(src, caption){
+  if(!src) return;
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxCaption').textContent = caption || '';
+  document.getElementById('lightboxOverlay').classList.add('active');
+}
+function closeLightbox(e){
+  if(e) e.stopPropagation();
+  document.getElementById('lightboxOverlay').classList.remove('active');
+  document.getElementById('lightboxImg').src = '';
+}
 
 function saveItem(){
   const id = document.getElementById('itemId').value;
@@ -807,10 +918,11 @@ function saveItem(){
   const stockQty = Number(document.getElementById('itemStock').value)||0;
   const alertThresholdRaw = document.getElementById('itemAlertThreshold').value;
   const alertThreshold = alertThresholdRaw==='' ? null : Number(alertThresholdRaw);
+  const image = document.getElementById('itemImageData').value || '';
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
-  const payload = { name, color, piecesCount, price, stockQty, alertThreshold };
+  const payload = { name, color, piecesCount, price, stockQty, alertThreshold, image };
   const today = new Date().toISOString().slice(0,10);
 
   if(id){
@@ -857,6 +969,7 @@ function renderItems(){
     const lowStock = remaining <= getAlertThreshold(item);
     return `
     <div class="item-card">
+      ${item.image ? `<div class="thumb" onclick='openLightbox(${JSON.stringify(item.image)}, ${JSON.stringify(item.name)})'><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>` : ''}
       <span class="badge">${item.piecesCount} قطع/طقم</span>
       <h3>${escapeHtml(item.name)}</h3>
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
@@ -885,6 +998,7 @@ function renderRemainingStock(){
     const lowStock = remaining <= getAlertThreshold(item);
     return `
     <div class="item-card">
+      ${item.image ? `<div class="thumb" onclick='openLightbox(${JSON.stringify(item.image)}, ${JSON.stringify(item.name)})'><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>` : ''}
       <span class="badge">${item.piecesCount} قطع/طقم</span>
       <h3>${escapeHtml(item.name)}</h3>
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
@@ -1103,6 +1217,7 @@ function addMerchantItemRow(existing){
   wrap.className = 'merchant-item-row';
   wrap.id = rowId;
   wrap.innerHTML = `
+    <div class="merchant-item-thumb" id="thumb_${rowId}">🧳</div>
     <div>
       <select class="merchant-item-select" onchange="onMerchantItemSelect('${rowId}')"></select>
     </div>
@@ -1119,8 +1234,26 @@ function addMerchantItemRow(existing){
   populateMerchantItemSelects();
   if(existing){
     wrap.querySelector('.merchant-item-select').value = existing.itemId;
+    updateMerchantRowThumb(rowId, existing.itemId);
   }
   recalcMerchantTotals();
+}
+
+function updateMerchantRowThumb(rowId, itemId){
+  const thumb = document.getElementById('thumb_'+rowId);
+  if(!thumb) return;
+  const itemObj = items.find(i=>i.id===itemId);
+  if(itemObj && itemObj.image){
+    thumb.style.backgroundImage = `url('${itemObj.image}')`;
+    thumb.textContent = '';
+    thumb.classList.add('has-img');
+    thumb.onclick = ()=> openLightbox(itemObj.image, itemObj.name);
+  }else{
+    thumb.style.backgroundImage = '';
+    thumb.textContent = '🧳';
+    thumb.classList.remove('has-img');
+    thumb.onclick = null;
+  }
 }
 
 function removeMerchantItemRow(rowId){
@@ -1135,6 +1268,7 @@ function onMerchantItemSelect(rowId){
   const opt = sel.options[sel.selectedIndex];
   const price = opt ? opt.getAttribute('data-price') : '';
   if(price) row.querySelector('.merchant-item-price').value = price;
+  updateMerchantRowThumb(rowId, sel.value);
   recalcMerchantTotals();
 }
 
