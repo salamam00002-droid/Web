@@ -142,7 +142,7 @@
   .btn-gold{background:var(--gold); color:var(--ink);}
   .btn-gold:hover{background:var(--gold-dark); color:#fff;}
   .btn-outline{background:none; border:1px solid var(--line); color:var(--ink);}
-  .btn-outline:hover{background:var(--cream); border-color:var(--ink); color:var(--ink);}
+  .btn-outline:hover{border-color:var(--ink);}
   .btn-danger{background:none; color:var(--red); border:1px solid #E7CFC8;}
   .btn-danger:hover{background:#FBEDEA;}
   .btn-sm{padding:6px 12px; font-size:12.5px; border-radius:8px;}
@@ -572,8 +572,6 @@
           <div class="img-preview" id="itemImagePreview" onclick="if(document.getElementById('itemImageData').value) openLightbox(document.getElementById('itemImageData').value, document.getElementById('itemName').value)">لا توجد صورة</div>
           <div class="img-upload-actions">
             <input type="file" id="itemImageFile" accept="image/*" onchange="handleItemImageChange(event)">
-            <button type="button" class="btn btn-outline btn-sm" id="cameraCaptureBtn" onclick="document.getElementById('itemImageCamera').click()">📷 التقاط صورة بالكاميرا</button>
-            <input type="file" id="itemImageCamera" accept="image/*" capture="environment" style="display:none;" onchange="handleItemImageChange(event)">
             <button type="button" class="btn btn-outline btn-sm" id="removeItemImageBtn" style="display:none;" onclick="removeItemImage()">إزالة الصورة</button>
           </div>
         </div>
@@ -909,7 +907,6 @@ function openItemModal(item){
   document.getElementById('itemStock').value = item ? item.stockQty : 0;
   document.getElementById('itemAlertThreshold').value = (item && item.alertThreshold!==null && item.alertThreshold!==undefined) ? item.alertThreshold : '';
   document.getElementById('itemImageFile').value = '';
-  document.getElementById('itemImageCamera').value = '';
   setItemImagePreview(item && item.image ? item.image : '');
   document.getElementById('itemModalOverlay').classList.add('active');
 }
@@ -932,7 +929,6 @@ function setItemImagePreview(dataUrl){
 }
 function removeItemImage(){
   document.getElementById('itemImageFile').value = '';
-  document.getElementById('itemImageCamera').value = '';
   setItemImagePreview('');
 }
 function handleItemImageChange(e){
@@ -1553,8 +1549,8 @@ function openMerchantItemsModal(tx){
       <div class="m-row" style="align-items:center;">
         <div style="display:flex; align-items:center; gap:10px;">
           ${img
-            ? `<span class="item-icon-avatar" style="width:38px; height:38px; margin-inline-start:0; background-image:url('${img}')"></span>`
-            : `<span class="item-icon-avatar item-icon-avatar--placeholder" style="width:38px; height:38px; margin-inline-start:0; font-size:16px;">🧳</span>`}
+            ? `<span class="item-icon-avatar" style="width:76px; height:76px; margin-inline-start:0; background-image:url('${img}')"></span>`
+            : `<span class="item-icon-avatar item-icon-avatar--placeholder" style="width:76px; height:76px; margin-inline-start:0; font-size:28px;">🧳</span>`}
           <div>
             <div style="font-weight:800; font-size:14px;">${escapeHtml(it.itemName||'')}</div>
             <div style="font-size:12px; color:var(--muted);">${escapeHtml(it.color||'—')} · الكمية: ${fmt(it.qty)}</div>
