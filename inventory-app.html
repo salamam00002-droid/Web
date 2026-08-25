@@ -572,6 +572,8 @@
           <div class="img-preview" id="itemImagePreview" onclick="if(document.getElementById('itemImageData').value) openLightbox(document.getElementById('itemImageData').value, document.getElementById('itemName').value)">لا توجد صورة</div>
           <div class="img-upload-actions">
             <input type="file" id="itemImageFile" accept="image/*" onchange="handleItemImageChange(event)">
+            <button type="button" class="btn btn-outline btn-sm" id="cameraCaptureBtn" onclick="document.getElementById('itemImageCamera').click()">📷 التقاط صورة بالكاميرا</button>
+            <input type="file" id="itemImageCamera" accept="image/*" capture="environment" style="display:none;" onchange="handleItemImageChange(event)">
             <button type="button" class="btn btn-outline btn-sm" id="removeItemImageBtn" style="display:none;" onclick="removeItemImage()">إزالة الصورة</button>
           </div>
         </div>
@@ -907,6 +909,7 @@ function openItemModal(item){
   document.getElementById('itemStock').value = item ? item.stockQty : 0;
   document.getElementById('itemAlertThreshold').value = (item && item.alertThreshold!==null && item.alertThreshold!==undefined) ? item.alertThreshold : '';
   document.getElementById('itemImageFile').value = '';
+  document.getElementById('itemImageCamera').value = '';
   setItemImagePreview(item && item.image ? item.image : '');
   document.getElementById('itemModalOverlay').classList.add('active');
 }
@@ -929,6 +932,7 @@ function setItemImagePreview(dataUrl){
 }
 function removeItemImage(){
   document.getElementById('itemImageFile').value = '';
+  document.getElementById('itemImageCamera').value = '';
   setItemImagePreview('');
 }
 function handleItemImageChange(e){
