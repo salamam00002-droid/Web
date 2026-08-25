@@ -202,6 +202,21 @@
   .merchant-card .m-row.remaining span:last-child{color:var(--red);}
   .merchant-card .actions{display:flex; gap:8px; margin-top:14px;}
 
+  /* ---------- item icons inside "عدد الأصناف" row ---------- */
+  .item-icons-stack{
+    display:flex; align-items:center; flex:1; justify-content:center; cursor:pointer; padding:2px 6px;
+  }
+  .item-icons-stack:hover{opacity:.85;}
+  .item-icon-avatar{
+    width:26px; height:26px; border-radius:50%; border:2px solid var(--paper);
+    background:var(--cream) center/cover no-repeat; box-shadow:0 1px 3px rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center; font-size:12px;
+    margin-inline-start:-8px; flex-shrink:0;
+  }
+  .item-icon-avatar:first-child{margin-inline-start:0;}
+  .item-icon-avatar--placeholder{color:var(--muted); background-color:var(--cream);}
+  .item-icon-avatar--extra{background-color:var(--gold); color:#fff; font-weight:800; font-size:10.5px;}
+
   /* ---------- table (merchants list) ---------- */
   table{width:100%; border-collapse:collapse; font-size:13.5px;}
   th{
@@ -630,6 +645,20 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="saveMerchantTx()">حفظ العملية</button>
       <button class="btn btn-outline" onclick="closeModal('merchantModalOverlay')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MERCHANT TX ITEMS MODAL ===== -->
+<div class="overlay" id="merchantItemsModalOverlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h3 id="merchantItemsModalTitle">أصناف العملية</h3>
+      <button class="icon-btn" onclick="closeModal('merchantItemsModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body" id="merchantItemsModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('merchantItemsModalOverlay')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -1459,6 +1488,52 @@ function normalizePhoneDigits(s){
   return (s||'').replace(/[^0-9]/g,'');
 }
 
+/* ---------- item icons for merchant cards ---------- */
+function txItemIconsHtml(tx){
+  const its = tx.items||[];
+  if(its.length===0) return '<span></span>';
+  const maxShown = 4;
+  const shown = its.slice(0, maxShown);
+  const extra = its.length - shown.length;
+  const avatars = shown.map(it=>{
+    const master = items.find(x=> x.id === it.itemId);
+    if(master && master.image){
+      return `<span class="item-icon-avatar" style="background-image:url('${master.image}')"></span>`;
+    }
+    return `<span class="item-icon-avatar item-icon-avatar--placeholder">🧳</span>`;
+  }).join('');
+  const extraBadge = extra>0 ? `<span class="item-icon-avatar item-icon-avatar--extra">+${extra}</span>` : '';
+  return `<span class="item-icons-stack" title="عرض الأصناف" onclick='event.stopPropagation(); openMerchantItemsModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>${avatars}${extraBadge}</span>`;
+}
+
+function openMerchantItemsModal(tx){
+  const its = tx.items||[];
+  document.getElementById('merchantItemsModalTitle').textContent = 'أصناف عملية: ' + (tx.merchantName||'');
+  const body = document.getElementById('merchantItemsModalBody');
+  if(its.length===0){
+    body.innerHTML = `<div class="empty"><div class="big">🧳</div>لا توجد أصناف مسجلة لهذه العملية.</div>`;
+  }else{
+    body.innerHTML = its.map(it=>{
+      const master = items.find(x=> x.id === it.itemId);
+      const img = master && master.image;
+      return `
+      <div class="m-row" style="align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${img
+            ? `<span class="item-icon-avatar" style="width:38px; height:38px; margin-inline-start:0; background-image:url('${img}')"></span>`
+            : `<span class="item-icon-avatar item-icon-avatar--placeholder" style="width:38px; height:38px; margin-inline-start:0; font-size:16px;">🧳</span>`}
+          <div>
+            <div style="font-weight:800; font-size:14px;">${escapeHtml(it.itemName||'')}</div>
+            <div style="font-size:12px; color:var(--muted);">${escapeHtml(it.color||'—')} · الكمية: ${fmt(it.qty)}</div>
+          </div>
+        </div>
+        <span>${fmt(it.subtotal)}</span>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('merchantItemsModalOverlay').classList.add('active');
+}
+
 function renderMerchants(){
   const box = document.getElementById('merchantsCards');
 
@@ -1495,7 +1570,7 @@ function renderMerchants(){
               <span class="pill paid">منتهية</span>
             </div>
             <div class="m-row"><span>تاريخ العملية</span><span>${fmtDate(tx.date)}</span></div>
-            <div class="m-row"><span>عدد الأصناف</span><span>${(tx.items||[]).length}</span></div>
+            <div class="m-row items-row"><span>عدد الأصناف</span>${txItemIconsHtml(tx)}<span>${(tx.items||[]).length}</span></div>
             <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
             <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
             <div class="actions">
@@ -1514,7 +1589,7 @@ function renderMerchants(){
           </div>
           <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
           ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${fmtDate(tx.dueDate)}</span></div>`:''}
-          <div class="m-row"><span>عدد الأصناف</span><span>${(tx.items||[]).length}</span></div>
+          <div class="m-row items-row"><span>عدد الأصناف</span>${txItemIconsHtml(tx)}<span>${(tx.items||[]).length}</span></div>
           <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
           <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
           <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
@@ -1560,7 +1635,7 @@ function renderMerchants(){
       </div>
       <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
       ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${fmtDate(tx.dueDate)}</span></div>`:''}
-      <div class="m-row"><span>عدد الأصناف</span><span>${(tx.items||[]).length}</span></div>
+      <div class="m-row items-row"><span>عدد الأصناف</span>${txItemIconsHtml(tx)}<span>${(tx.items||[]).length}</span></div>
       <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
       <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
       <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
