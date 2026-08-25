@@ -347,7 +347,21 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
   @media(max-width:640px){
-    .merchant-item-row{grid-template-columns:auto 1fr 1fr; }
+    .merchant-item-row{
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-areas:
+        "thumb name name"
+        "qty price subtotal"
+        "del del del";
+      gap:8px;
+    }
+    .merchant-item-row .mi-thumb{grid-area:thumb;}
+    .merchant-item-row .mi-name{grid-area:name; min-width:0;}
+    .merchant-item-row .mi-name .merchant-item-select{width:100%;}
+    .merchant-item-row .mi-qty{grid-area:qty;}
+    .merchant-item-row .mi-price{grid-area:price;}
+    .merchant-item-row .mi-subtotal{grid-area:subtotal; text-align:center;}
+    .merchant-item-row .mi-del{grid-area:del; justify-self:end;}
     header{padding:14px 16px;}
   }
 
@@ -1261,18 +1275,18 @@ function addMerchantItemRow(existing){
   wrap.className = 'merchant-item-row';
   wrap.id = rowId;
   wrap.innerHTML = `
-    <div class="merchant-item-thumb" id="thumb_${rowId}">🧳</div>
-    <div>
+    <div class="merchant-item-thumb mi-thumb" id="thumb_${rowId}">🧳</div>
+    <div class="mi-name">
       <select class="merchant-item-select" onchange="onMerchantItemSelect('${rowId}')"></select>
     </div>
-    <div>
+    <div class="mi-qty">
       <input type="number" min="1" class="merchant-item-qty" placeholder="الكمية" value="${existing?existing.qty:1}" oninput="recalcMerchantTotals()">
     </div>
-    <div>
+    <div class="mi-price">
       <input type="number" min="0" step="0.01" class="merchant-item-price" placeholder="سعر الوحدة" value="${existing?existing.unitPrice:''}" oninput="recalcMerchantTotals()">
     </div>
-    <div class="sub merchant-item-subtotal">0</div>
-    <button class="icon-btn" onclick="removeMerchantItemRow('${rowId}')">🗑</button>
+    <div class="sub merchant-item-subtotal mi-subtotal">0</div>
+    <button class="icon-btn mi-del" onclick="removeMerchantItemRow('${rowId}')">🗑</button>
   `;
   document.getElementById('merchantItemsList').appendChild(wrap);
   populateMerchantItemSelects();
