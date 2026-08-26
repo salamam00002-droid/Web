@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
+    color-scheme:light;
     --ink:#1B2A4A;
     --ink-2:#2E3F63;
     --gold:#C89B3C;
@@ -22,6 +23,26 @@
     --green:#3E7A52;
     --radius:14px;
     --shadow:0 4px 18px rgba(27,42,74,0.08);
+  }
+  html.dark-mode{
+    color-scheme:dark;
+    --ink:#EDEFF5;
+    --ink-2:#C7CEDE;
+    --gold:#D8AE55;
+    --gold-dark:#EFC878;
+    --cream:#20263A;
+    --paper:#262D44;
+    --line:#3A425E;
+    --muted:#9AA3BD;
+    --red:#E17E6B;
+    --green:#6BC48C;
+    --shadow:0 4px 18px rgba(0,0,0,0.35);
+  }
+  html.dark-mode body{background:#161B2C;}
+  html.dark-mode header{background:#12172A;}
+  html.dark-mode nav{background:#1B2138;}
+  html.dark-mode input, html.dark-mode select, html.dark-mode textarea{
+    background:#1E2440;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
@@ -141,13 +162,15 @@
   .btn:hover{background:var(--ink-2);}
   .btn-gold{background:var(--gold); color:var(--ink);}
   .btn-gold:hover{background:var(--gold-dark); color:#fff;}
-  .btn-outline{background:none; border:1px solid var(--line); color:var(--ink);}
-  .btn-outline:hover{border-color:var(--ink);}
+  .btn-outline{background:var(--paper); border:1px solid var(--line); color:var(--ink);}
+  .btn-outline:hover{background:var(--cream); border-color:var(--ink); color:var(--ink);}
   .btn-danger{background:none; color:var(--red); border:1px solid #E7CFC8;}
+  html.dark-mode .btn-danger{border-color:#5A3B36;}
   .btn-danger:hover{background:#FBEDEA;}
+  html.dark-mode .btn-danger:hover{background:#3A2620;}
   .btn-sm{padding:6px 12px; font-size:12.5px; border-radius:8px;}
   .icon-btn{
-    background:none; border:none; cursor:pointer; font-size:16px; padding:4px 8px;
+    background:transparent; border:none; cursor:pointer; font-size:16px; padding:4px 8px;
     border-radius:6px; color:var(--muted);
   }
   .icon-btn:hover{background:var(--cream); color:var(--ink);}
@@ -207,6 +230,19 @@
     display:flex; align-items:center; flex:1; justify-content:center; cursor:pointer; padding:2px 6px;
   }
   .item-icons-stack:hover{opacity:.85;}
+  [data-tooltip]{position:relative;}
+  [data-tooltip]::after{
+    content:attr(data-tooltip);
+    position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+    background:var(--cream); color:var(--ink); border:1px solid var(--line);
+    font-family:'Tajawal',sans-serif; font-size:12px; font-weight:700;
+    padding:5px 10px; border-radius:6px; white-space:nowrap;
+    box-shadow:0 3px 10px rgba(0,0,0,.12);
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition:opacity .15s ease, visibility .15s ease;
+    z-index:80;
+  }
+  [data-tooltip]:hover::after{opacity:1; visibility:visible;}
   .item-icon-avatar{
     width:26px; height:26px; border-radius:50%; border:2px solid var(--paper);
     background:var(--cream) center/cover no-repeat; box-shadow:0 1px 3px rgba(0,0,0,.15);
@@ -396,6 +432,7 @@
 <header>
   <div class="brand">🧳 مخزنى <span class="tag">SUITCASE STOCK</span></div>
   <div style="display:flex; align-items:center; gap:16px;">
+    <button id="darkModeToggle" onclick="toggleDarkMode()" title="الوضع الليلي" aria-label="تبديل الوضع الليلي" style="background:none; border:1px solid rgba(255,255,255,.3); color:#fff; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.15s;">🌙</button>
     <div id="notifBell" class="notif-bell" onclick="toggleNotifPanel()">
       🔔<span id="notifBadge" class="notif-badge">0</span>
       <div id="notifPanel" class="notif-panel"></div>
@@ -710,6 +747,19 @@
 </div>
 
 <script>
+/* ===================== DARK MODE ===================== */
+function applyDarkMode(isDark){
+  document.documentElement.classList.toggle('dark-mode', isDark);
+  const btn = document.getElementById('darkModeToggle');
+  if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+}
+function toggleDarkMode(){
+  const isDark = !document.documentElement.classList.contains('dark-mode');
+  localStorage.setItem('invapp_dark_mode', isDark ? '1' : '0');
+  applyDarkMode(isDark);
+}
+applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
+
 /* ===================== STATE ===================== */
 let db = null;
 let items = [];      // {id, name, color, piecesCount, price, stockQty, alertThreshold}
@@ -1532,7 +1582,7 @@ function txItemIconsHtml(tx){
     return `<span class="item-icon-avatar item-icon-avatar--placeholder">🧳</span>`;
   }).join('');
   const extraBadge = extra>0 ? `<span class="item-icon-avatar item-icon-avatar--extra">+${extra}</span>` : '';
-  return `<span class="item-icons-stack" title="عرض الأصناف" onclick='event.stopPropagation(); openMerchantItemsModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>${avatars}${extraBadge}</span>`;
+  return `<span class="item-icons-stack" data-tooltip="عرض الأصناف" onclick='event.stopPropagation(); openMerchantItemsModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>${avatars}${extraBadge}</span>`;
 }
 
 function openMerchantItemsModal(tx){
