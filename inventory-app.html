@@ -456,6 +456,7 @@
 <header>
   <div class="brand"><img src="logo.png" alt="لوجو" class="brand-logo" onerror="this.style.display='none'"> مخزنى</div>
   <div style="display:flex; align-items:center; gap:16px;">
+    <button id="backupToggle" onclick="openBackupModal()" title="نسخ احتياطي" aria-label="النسخ الاحتياطي" style="background:none; border:1px solid rgba(255,255,255,.3); color:#fff; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.15s;">💾</button>
     <button id="readOnlyToggle" onclick="toggleReadOnlyMode()" title="وضع القراءة فقط" aria-label="تبديل وضع القراءة فقط" style="background:none; border:1px solid rgba(255,255,255,.3); color:#fff; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.15s;">🔓</button>
     <button id="darkModeToggle" onclick="toggleDarkMode()" title="الوضع الليلي" aria-label="تبديل الوضع الليلي" style="background:none; border:1px solid rgba(255,255,255,.3); color:#fff; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.15s;">🌙</button>
     <div id="notifBell" class="notif-bell" onclick="toggleNotifPanel()">
@@ -742,6 +743,34 @@
   </div>
 </div>
 
+<!-- ===== BACKUP / RESTORE MODAL ===== -->
+<input type="file" id="backupFileInput" accept="application/json,.json" style="display:none;" onchange="handleImportBackupFile(event)">
+<div class="overlay" id="backupModalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>النسخ الاحتياطي</h3>
+      <button class="icon-btn" onclick="closeModal('backupModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="page-sub" style="margin-bottom:16px;">
+        النسخة الاحتياطية تشمل كل البيانات: الأصناف، عمليات التجار، المعاملات المنتهية، وسجل حركة المخزون — فى ملف JSON واحد يُحفظ على جهازك.
+      </p>
+      <button class="btn btn-gold" style="width:100%; margin-bottom:20px;" onclick="exportFullBackup()">⬇️ تصدير نسخة احتياطية</button>
+
+      <div style="border-top:1px dashed var(--line); padding-top:16px;">
+        <p style="font-size:13px; font-weight:800; color:var(--red); margin-bottom:8px;">⚠️ استيراد نسخة احتياطية</p>
+        <p class="page-sub" style="margin-bottom:12px;">
+          هذه العملية تحذف كل البيانات الحالية فى قاعدة البيانات نهائياً وتستبدلها بمحتوى الملف الذى تختاره. تأكد أنك تملك نسخة من البيانات الحالية قبل المتابعة إن احتجتها.
+        </p>
+        <button class="btn btn-outline edit-action" style="width:100%; border-color:var(--red); color:var(--red);" onclick="triggerImportBackup()">📥 اختيار ملف واستعادة (استبدال كامل)</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('backupModalOverlay')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== ITEM ARCHIVE MODAL ===== -->
 <div class="overlay" id="itemArchiveModalOverlay">
   <div class="modal">
@@ -851,6 +880,7 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="printStatement()">🖨 طباعة</button>
       <button class="btn btn-outline" onclick="exportCurrentStatementCsv()">⬇️ تصدير CSV</button>
+      <button class="btn btn-outline" style="color:var(--green); border-color:var(--green);" onclick="sendStatementWhatsapp()">📱 إرسال واتساب</button>
       <button class="btn btn-outline" onclick="closeModal('statementModalOverlay')">إغلاق</button>
     </div>
   </div>
@@ -1386,6 +1416,125 @@ function exportItemsCsv(){
     rows.push([i.name, i.category||'', i.sku||'', i.color||'', i.piecesCount, i.price, i.stockQty, issuedQtyFor(i.id), remainingQtyFor(i), itemCreatedDateStr(i)]);
   });
   downloadCsv('الأصناف.csv', rows);
+}
+
+/* ===================== النسخ الاحتياطي (تصدير/استيراد شامل) ===================== */
+function openBackupModal(){
+  document.getElementById('backupModalOverlay').classList.add('active');
+}
+
+/* يحوّل حقول Firestore Timestamp لصيغة قابلة للتخزين فى JSON */
+function serializeDocForExport(docData){
+  const out = {...docData};
+  Object.keys(out).forEach(k=>{
+    if(out[k] && typeof out[k].toDate === 'function'){
+      out[k] = {__ts:true, iso: out[k].toDate().toISOString()};
+    }
+  });
+  return out;
+}
+/* يرجع حقول التاريخ المحوّلة إلى Firestore Timestamp حقيقية عند الاستعادة */
+function deserializeDocForImport(docData){
+  const out = {...docData};
+  Object.keys(out).forEach(k=>{
+    if(out[k] && typeof out[k]==='object' && out[k].__ts){
+      out[k] = firebase.firestore.Timestamp.fromDate(new Date(out[k].iso));
+    }
+  });
+  return out;
+}
+
+function exportFullBackup(){
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    app: 'مخزنى',
+    items: items.map(serializeDocForExport),
+    merchantTxs: merchantTxs.map(serializeDocForExport),
+    archivedMerchantTxs: archivedMerchantTxs.map(serializeDocForExport),
+    stockMovements: stockMovements.map(serializeDocForExport)
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `نسخة-احتياطية-مخزنى-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('تم تصدير النسخة الاحتياطية');
+}
+
+function triggerImportBackup(){
+  document.getElementById('backupFileInput').click();
+}
+
+function handleImportBackupFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    let data;
+    try{ data = JSON.parse(ev.target.result); }
+    catch(err){ showToast('ملف غير صالح: '+err.message); e.target.value=''; return; }
+    if(!data || (!Array.isArray(data.items) && !Array.isArray(data.merchantTxs))){
+      showToast('صيغة النسخة الاحتياطية غير معروفة'); e.target.value=''; return;
+    }
+    const counts = `${(data.items||[]).length} صنف، ${(data.merchantTxs||[]).length} عملية تاجر، ${(data.archivedMerchantTxs||[]).length} معاملة منتهية، ${(data.stockMovements||[]).length} حركة مخزون`;
+    const ok1 = confirm(`تحذير: سيتم حذف كل البيانات الحالية فى قاعدة البيانات نهائياً واستبدالها بمحتوى هذا الملف (${counts}).\n\nهل تريد المتابعة؟`);
+    if(!ok1){ e.target.value=''; return; }
+    const ok2 = confirm('تأكيد أخير: هذه الخطوة لا يمكن التراجع عنها بعد التنفيذ. متابعة؟');
+    if(!ok2){ e.target.value=''; return; }
+    restoreFullBackup(data);
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function commitOpsInChunks(ops){
+  const chunkSize = 450;
+  const chunks = [];
+  for(let i=0;i<ops.length;i+=chunkSize) chunks.push(ops.slice(i,i+chunkSize));
+  return chunks.reduce((p, chunk)=> p.then(()=>{
+    const batch = db.batch();
+    chunk.forEach(o=>{
+      if(o.op==='delete') batch.delete(o.ref);
+      else batch.set(o.ref, o.data);
+    });
+    return batch.commit();
+  }), Promise.resolve());
+}
+
+function clearCollection(name){
+  return db.collection(name).get().then(snap=>
+    commitOpsInChunks(snap.docs.map(d=> ({ref:d.ref, op:'delete'})))
+  );
+}
+
+function writeBackupCollection(name, list){
+  const ops = (list||[]).map(item=>{
+    const {id, ...rest} = item;
+    const data = deserializeDocForImport(rest);
+    const ref = id ? db.collection(name).doc(id) : db.collection(name).doc();
+    return {ref, op:'set', data};
+  });
+  return commitOpsInChunks(ops);
+}
+
+function restoreFullBackup(data){
+  showToast('جارٍ استعادة النسخة الاحتياطية...');
+  Promise.all([
+    clearCollection('items'),
+    clearCollection('merchantTransactions'),
+    clearCollection('archivedMerchantTransactions'),
+    clearCollection('stockMovements')
+  ]).then(()=> Promise.all([
+    writeBackupCollection('items', data.items),
+    writeBackupCollection('merchantTransactions', data.merchantTxs),
+    writeBackupCollection('archivedMerchantTransactions', data.archivedMerchantTxs),
+    writeBackupCollection('stockMovements', data.stockMovements)
+  ])).then(()=>{
+    showToast('تمت استعادة النسخة الاحتياطية بنجاح');
+    closeModal('backupModalOverlay');
+  }).catch(err=> showToast('خطأ أثناء الاستعادة: '+err.message));
 }
 
 function renderRemainingStock(){
@@ -2102,7 +2251,7 @@ function openStatementModal(merchantName){
     </div>
   `;
   document.getElementById('statementModalOverlay').classList.add('active');
-  currentStatementExport = {merchantName, txs, itemsAggList, allPayments, totalAll, paidAll, remainingAll};
+  currentStatementExport = {merchantName, phone, txs, itemsAggList, allPayments, totalAll, paidAll, remainingAll};
 }
 
 function printStatement(){
@@ -2132,6 +2281,29 @@ function exportCurrentStatementCsv(){
   rows.push(['إجمالي المدفوع', s.paidAll]);
   rows.push(['المتبقي الإجمالي', s.remainingAll]);
   downloadCsv('كشف حساب - ' + s.merchantName + '.csv', rows);
+}
+
+/* يحوّل رقم تليفون مصري محلي (01xxxxxxxxx) لصيغة دولية لواتساب (20xxxxxxxxx) */
+function normalizePhoneForWhatsapp(phone){
+  let digits = (phone||'').replace(/[^\d]/g,'');
+  if(!digits) return '';
+  if(digits.startsWith('00')) digits = digits.slice(2);
+  if(digits.startsWith('0')) digits = '20' + digits.slice(1);
+  return digits;
+}
+
+function sendStatementWhatsapp(){
+  if(!currentStatementExport){ showToast('لا يوجد كشف حساب مفتوح'); return; }
+  const s = currentStatementExport;
+  if(!s.phone){ showToast('لا يوجد رقم تليفون مسجل لهذا التاجر'); return; }
+  const waNumber = normalizePhoneForWhatsapp(s.phone);
+  const msg =
+    `كشف حساب: ${s.merchantName}\n` +
+    `عدد العمليات: ${s.txs.length}\n` +
+    `إجمالي كل العمليات: ${fmt(s.totalAll)}\n` +
+    `إجمالي المدفوع: ${fmt(s.paidAll)}\n` +
+    `المتبقي: ${fmt(s.remainingAll)}`;
+  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function renderDashboard(){
