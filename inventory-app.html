@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مخزنى</title>
+<link rel="icon" type="image/png" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -71,6 +72,14 @@
     display:flex;
     align-items:center;
     gap:10px;
+  }
+  header .brand .brand-logo{
+    height:34px;
+    width:34px;
+    object-fit:contain;
+    border-radius:8px;
+    background:#fff;
+    padding:2px;
   }
   header .brand .tag{
     display:inline-block;
@@ -282,6 +291,21 @@
   }
   .notif-panel.active{display:block;}
   .notif-section-title{font-size:11px; font-weight:800; color:var(--muted); padding:8px 8px 2px;}
+
+  /* ---------- filters row ---------- */
+  .filters-row{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:var(--paper);
+    border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:16px; box-shadow:var(--shadow);
+  }
+  .filters-row .field{margin-bottom:0; flex:1; min-width:140px;}
+  .filters-row .field.grow2{flex:2;}
+  .link-btn{background:none; border:none; color:var(--gold-dark); font-weight:700; font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;}
+  .category-chip{display:inline-block; background:var(--cream); border:1px solid var(--line); color:var(--muted); font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; margin-inline-end:6px;}
+  .sku-tag{font-size:11px; color:var(--muted); font-family:'Cairo',sans-serif; margin-bottom:6px;}
+  .stagnant-warn{color:var(--gold-dark)!important;}
+
+  /* ---------- read-only mode ---------- */
+  .read-only-mode .edit-action{display:none !important;}
   .notif-item{font-size:12.5px; padding:8px; border-radius:8px; cursor:pointer; line-height:1.6;}
   .notif-item:hover{background:var(--cream);}
   .notif-empty{font-size:12.5px; color:var(--muted); padding:16px 10px; text-align:center;}
@@ -430,8 +454,9 @@
 <body>
 
 <header>
-  <div class="brand">🧳 مخزنى <span class="tag">SUITCASE STOCK</span></div>
+  <div class="brand"><img src="logo.png" alt="لوجو" class="brand-logo" onerror="this.style.display='none'"> مخزنى <span class="tag">SUITCASE STOCK</span></div>
   <div style="display:flex; align-items:center; gap:16px;">
+    <button id="readOnlyToggle" onclick="toggleReadOnlyMode()" title="وضع القراءة فقط" aria-label="تبديل وضع القراءة فقط" style="background:none; border:1px solid rgba(255,255,255,.3); color:#fff; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.15s;">🔓</button>
     <button id="darkModeToggle" onclick="toggleDarkMode()" title="الوضع الليلي" aria-label="تبديل الوضع الليلي" style="background:none; border:1px solid rgba(255,255,255,.3); color:#fff; width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.15s;">🌙</button>
     <div id="notifBell" class="notif-bell" onclick="toggleNotifPanel()">
       🔔<span id="notifBadge" class="notif-badge">0</span>
@@ -508,6 +533,15 @@
     <div class="section-head"><h2>أصناف على وشك النفاد</h2></div>
     <div id="lowStockList" class="card"></div>
 
+    <div class="section-head"><h2>⏳ أصناف راكدة (لم تُصرف منذ 30 يوماً أو أكثر)</h2></div>
+    <div id="stagnantList" class="card"></div>
+
+    <div class="section-head"><h2>🔥 الأكثر طلباً</h2></div>
+    <div id="topItemsList" class="card"></div>
+
+    <div class="section-head"><h2>💰 أكبر مديونية عند التجار</h2></div>
+    <div id="topDebtorsList" class="card"></div>
+
     <div class="section-head"><h2>آخر عمليات التجار</h2></div>
     <div class="card" style="overflow-x:auto;">
       <table id="recentMerchantsTable">
@@ -524,8 +558,35 @@
         <div class="page-title">الأصناف</div>
         <div class="page-sub">إدارة الأصناف : الاسم، اللون، عدد القطع بالطقم، السعر، والكمية</div>
       </div>
-      <button class="btn btn-gold" onclick="openItemModal()">+ إضافة صنف</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="exportItemsCsv()">⬇️ تصدير CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="openItemArchiveModal()">🗄️ الأرشيف (<span id="itemArchiveCount">0</span>)</button>
+        <button class="btn btn-gold edit-action" onclick="openItemModal()">+ إضافة صنف</button>
+      </div>
     </div>
+
+    <div class="filters-row">
+      <div class="field grow2">
+        <label>🔍 بحث بالاسم أو اللون أو الكود</label>
+        <input id="itemSearchInput" placeholder="اكتب للبحث..." oninput="renderItems()">
+      </div>
+      <div class="field">
+        <label>الفئة</label>
+        <select id="itemCategoryFilter" onchange="renderItems()">
+          <option value="">كل الفئات</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>الترتيب حسب</label>
+        <select id="itemSortSelect" onchange="renderItems()">
+          <option value="new">الأحدث إضافة</option>
+          <option value="name">الاسم (أ-ي)</option>
+          <option value="lowstock">الأقل مخزوناً</option>
+          <option value="stagnant">الأكثر ركوداً</option>
+        </select>
+      </div>
+    </div>
+
     <div id="itemsGrid" class="items-grid"></div>
   </div>
 
@@ -547,7 +608,32 @@
         <div class="page-title">سجل حركة المخزون</div>
         <div class="page-sub">كل عمليات إضافة وخصم الكمية بتاريخها، بدل الاعتماد على الحساب الآني فقط</div>
       </div>
+      <button class="btn btn-outline btn-sm" onclick="clearMovementFilters()">مسح الفلاتر</button>
     </div>
+
+    <div class="filters-row">
+      <div class="field grow2">
+        <label>🔍 اسم الصنف</label>
+        <input id="movFilterItem" placeholder="اكتب اسم الصنف..." oninput="renderMovements()">
+      </div>
+      <div class="field">
+        <label>النوع</label>
+        <select id="movFilterType" onchange="renderMovements()">
+          <option value="">الكل</option>
+          <option value="in">إضافة</option>
+          <option value="out">خصم</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>من تاريخ</label>
+        <input id="movFilterFrom" type="date" onchange="renderMovements()">
+      </div>
+      <div class="field">
+        <label>إلى تاريخ</label>
+        <input id="movFilterTo" type="date" onchange="renderMovements()">
+      </div>
+    </div>
+
     <div class="card" style="overflow-x:auto;">
       <table id="movementsTable">
         <thead><tr><th>التاريخ</th><th>الصنف</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
@@ -563,7 +649,7 @@
         <div class="page-title">التجار</div>
         <div class="page-sub">تسجيل ما أخذه كل تاجر من الأصناف، والدفعات والمتبقي</div>
       </div>
-      <button class="btn btn-gold" onclick="openMerchantModal()">+ عملية جديدة</button>
+      <button class="btn btn-gold edit-action" onclick="openMerchantModal()">+ عملية جديدة</button>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
@@ -619,6 +705,15 @@
       </div>
       <div class="form-grid">
         <div class="field">
+          <label>الفئة (اختياري)</label>
+          <input id="itemCategory" list="itemCategoryList" placeholder="مثال: شنط سفر">
+          <datalist id="itemCategoryList"></datalist>
+        </div>
+        <div class="field">
+          <label>كود الصنف SKU (اختياري)</label>
+          <input id="itemSku" placeholder="مثال: BAG-A-001">
+        </div>
+        <div class="field">
           <label>اللون</label>
           <input id="itemColor" placeholder="مثال: أزرق كحلي">
         </div>
@@ -643,6 +738,20 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="saveItem()">حفظ</button>
       <button class="btn btn-outline" onclick="closeModal('itemModalOverlay')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ITEM ARCHIVE MODAL ===== -->
+<div class="overlay" id="itemArchiveModalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>أرشيف الأصناف</h3>
+      <button class="icon-btn" onclick="closeModal('itemArchiveModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body" id="itemArchiveBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('itemArchiveModalOverlay')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -741,6 +850,7 @@
     <div class="modal-body" id="statementBody"></div>
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="printStatement()">🖨 طباعة</button>
+      <button class="btn btn-outline" onclick="exportCurrentStatementCsv()">⬇️ تصدير CSV</button>
       <button class="btn btn-outline" onclick="closeModal('statementModalOverlay')">إغلاق</button>
     </div>
   </div>
@@ -760,6 +870,38 @@ function toggleDarkMode(){
 }
 applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
 
+/* ===================== وضع القراءة فقط (حماية بسيطة من التعديل غير المقصود) =====================
+   ملاحظة: هذه حماية على مستوى المتصفح فقط للمنع من الأخطاء العرضية، وليست نظام صلاحيات حقيقي
+   يمنع أشخاصاً آخرين من الوصول للبيانات؛ لصلاحيات حقيقية متعددة المستخدمين يلزم تفعيل Firebase Authentication. */
+function isReadOnlyMode(){ return document.body.classList.contains('read-only-mode'); }
+function setReadOnlyMode(on){
+  document.body.classList.toggle('read-only-mode', on);
+  localStorage.setItem('invapp_readonly_active', on ? '1' : '0');
+  const btn = document.getElementById('readOnlyToggle');
+  if(btn) btn.textContent = on ? '🔒' : '🔓';
+}
+function toggleReadOnlyMode(){
+  if(isReadOnlyMode()){
+    const pin = localStorage.getItem('invapp_readonly_pin') || '';
+    const entered = prompt('أدخل كلمة المرور لإلغاء وضع القراءة فقط:');
+    if(entered===null) return;
+    if(pin && entered !== pin){ showToast('كلمة مرور غير صحيحة'); return; }
+    setReadOnlyMode(false);
+    showToast('تم إلغاء وضع القراءة فقط');
+  }else{
+    let pin = localStorage.getItem('invapp_readonly_pin') || '';
+    if(!pin){
+      const newPin = prompt('لأول مرة: اختر كلمة مرور ستحتاجها لاحقاً لإلغاء وضع القراءة فقط:');
+      if(newPin===null) return;
+      if(!newPin.trim()){ showToast('يجب اختيار كلمة مرور'); return; }
+      localStorage.setItem('invapp_readonly_pin', newPin.trim());
+    }
+    setReadOnlyMode(true);
+    showToast('تم تفعيل وضع القراءة فقط — أزرار الإضافة والتعديل والحذف مخفية الآن');
+  }
+}
+setReadOnlyMode(localStorage.getItem('invapp_readonly_active') === '1');
+
 /* ===================== STATE ===================== */
 let db = null;
 let items = [];      // {id, name, color, piecesCount, price, stockQty, alertThreshold}
@@ -768,6 +910,7 @@ let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد 
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
 let paymentRowCount = 0;
+let currentStatementExport = null;
 
 /* ===================== FIREBASE INIT ===================== */
 // إعدادات المشروع مثبّتة هنا حتى يتصل التطبيق تلقائياً لأي شخص يفتحه، بدون الحاجة لإدخالها كل مرة.
@@ -872,7 +1015,7 @@ function getAlertThreshold(item){
   return Number(t);
 }
 function getLowStockItems(){
-  return items.filter(i=> remainingQtyFor(i) <= getAlertThreshold(i));
+  return items.filter(i=> !i.archived && remainingQtyFor(i) <= getAlertThreshold(i));
 }
 function isOverdue(tx){
   if(!tx.dueDate || Number(tx.remaining)<=0) return false;
@@ -921,6 +1064,12 @@ function fmtDate(d){
   if(!m) return d;
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
+function itemCreatedDateStr(item){
+  if(!item || !item.createdAt) return '';
+  const dateObj = item.createdAt.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
+  if(isNaN(dateObj.getTime())) return '';
+  return fmtDate(dateObj.toISOString().slice(0,10));
+}
 function issuedQtyFor(itemId){
   let sum = 0;
   merchantTxs.forEach(tx=>{
@@ -951,6 +1100,8 @@ function openItemModal(item){
   document.getElementById('itemModalTitle').textContent = item ? 'تعديل الصنف' : 'إضافة صنف جديد';
   document.getElementById('itemId').value = item ? item.id : '';
   document.getElementById('itemName').value = item ? item.name : '';
+  document.getElementById('itemCategory').value = item ? (item.category||'') : '';
+  document.getElementById('itemSku').value = item ? (item.sku||'') : '';
   document.getElementById('itemColor').value = item ? item.color : '';
   document.getElementById('itemPieces').value = item ? item.piecesCount : 3;
   document.getElementById('itemPrice').value = item ? item.price : '';
@@ -1020,6 +1171,8 @@ function closeLightbox(e){
 function saveItem(){
   const id = document.getElementById('itemId').value;
   const name = document.getElementById('itemName').value.trim();
+  const category = document.getElementById('itemCategory').value.trim();
+  const sku = document.getElementById('itemSku').value.trim();
   const color = document.getElementById('itemColor').value.trim();
   const piecesCount = Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
@@ -1030,7 +1183,7 @@ function saveItem(){
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
-  const payload = { name, color, piecesCount, price, stockQty, alertThreshold, image };
+  const payload = { name, category, sku, color, piecesCount, price, stockQty, alertThreshold, image };
   const today = new Date().toISOString().slice(0,10);
 
   if(id){
@@ -1058,48 +1211,191 @@ function saveItem(){
   }
 }
 
+/* أرشفة بدل الحذف النهائي، حفاظاً على تاريخ الحركة المرتبط بالصنف */
 function deleteItem(id){
-  if(!confirm('هل تريد حذف هذا الصنف نهائياً؟')) return;
-  db.collection('items').doc(id).delete()
-    .then(()=> showToast('تم حذف الصنف'))
+  if(!confirm('هل تريد نقل هذا الصنف إلى الأرشيف؟ يمكنك استعادته لاحقاً من الأرشيف.')) return;
+  db.collection('items').doc(id).update({archived:true, archivedAt: firebase.firestore.FieldValue.serverTimestamp()})
+    .then(()=> showToast('تم نقل الصنف إلى الأرشيف'))
     .catch(e=> showToast('خطأ: '+e.message));
+}
+function restoreItem(id){
+  db.collection('items').doc(id).update({archived:false, archivedAt: firebase.firestore.FieldValue.delete()})
+    .then(()=> showToast('تم استعادة الصنف'))
+    .catch(e=> showToast('خطأ: '+e.message));
+}
+function permanentlyDeleteItem(id){
+  if(!confirm('حذف نهائي لا يمكن التراجع عنه. هل أنت متأكد؟')) return;
+  db.collection('items').doc(id).delete()
+    .then(()=> showToast('تم الحذف النهائي'))
+    .catch(e=> showToast('خطأ: '+e.message));
+}
+
+/* آخر تاريخ صُرف فيه الصنف لتاجر، لحساب الركود */
+function lastIssuedDateFor(itemId){
+  let last = '';
+  merchantTxs.forEach(tx=>{
+    (tx.items||[]).forEach(it=>{
+      if(it.itemId===itemId && tx.date && tx.date > last) last = tx.date;
+    });
+  });
+  return last;
+}
+function daysSince(dateStr){
+  if(!dateStr) return Infinity;
+  const d = new Date(dateStr);
+  if(isNaN(d.getTime())) return Infinity;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function getStagnantItems(minDays){
+  minDays = minDays || 30;
+  return items.filter(i=> !i.archived && remainingQtyFor(i) > 0 && daysSince(lastIssuedDateFor(i.id)) >= minDays);
+}
+
+function populateItemCategoryFilter(){
+  const sel = document.getElementById('itemCategoryFilter');
+  const dl = document.getElementById('itemCategoryList');
+  if(!sel) return;
+  const cats = [...new Set(items.filter(i=>i.category).map(i=>i.category))].sort();
+  const current = sel.value;
+  sel.innerHTML = `<option value="">كل الفئات</option>` + cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if(cats.includes(current)) sel.value = current;
+  if(dl) dl.innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">`).join('');
 }
 
 function renderItems(){
   const grid = document.getElementById('itemsGrid');
+  populateItemCategoryFilter();
+  const archivedCountEl = document.getElementById('itemArchiveCount');
+  if(archivedCountEl) archivedCountEl.textContent = items.filter(i=>i.archived).length;
+
+  let list = items.filter(i=> !i.archived);
+
+  const search = (document.getElementById('itemSearchInput')?.value||'').trim().toLowerCase();
+  const category = document.getElementById('itemCategoryFilter')?.value || '';
+  const sortBy = document.getElementById('itemSortSelect')?.value || 'new';
+
+  if(search){
+    list = list.filter(i=>
+      (i.name||'').toLowerCase().includes(search) ||
+      (i.color||'').toLowerCase().includes(search) ||
+      (i.sku||'').toLowerCase().includes(search)
+    );
+  }
+  if(category){ list = list.filter(i=> i.category===category); }
+
+  if(sortBy==='name'){
+    list = [...list].sort((a,b)=> (a.name||'').localeCompare(b.name||'','ar'));
+  }else if(sortBy==='lowstock'){
+    list = [...list].sort((a,b)=> remainingQtyFor(a) - remainingQtyFor(b));
+  }else if(sortBy==='stagnant'){
+    list = [...list].sort((a,b)=> daysSince(lastIssuedDateFor(b.id)) - daysSince(lastIssuedDateFor(a.id)));
+  }
+  /* 'new' يعتمد على ترتيب items الأصلي (الأحدث أولاً من orderBy createdAt desc) */
+
   if(items.length===0){
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="big">🧳</div>لا توجد أصناف بعد. اضغط "إضافة صنف" للبدء.</div>`;
     return;
   }
-  grid.innerHTML = items.map(item=>{
+  if(list.length===0){
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="big">🔍</div>لا توجد أصناف مطابقة لبحثك.</div>`;
+    return;
+  }
+  grid.innerHTML = list.map(item=>{
     const issued = issuedQtyFor(item.id);
     const remaining = remainingQtyFor(item);
     const lowStock = remaining <= getAlertThreshold(item);
+    const createdDate = itemCreatedDateStr(item);
+    const stagnantDays = daysSince(lastIssuedDateFor(item.id));
+    const isStagnant = remaining > 0 && stagnantDays >= 30 && stagnantDays !== Infinity;
     return `
     <div class="item-card">
       ${item.image ? `<div class="thumb" onclick='openLightbox(${JSON.stringify(item.image)}, ${JSON.stringify(item.name)})'><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>` : ''}
       <span class="badge">${item.piecesCount} قطع/طقم</span>
+      ${item.category ? `<span class="category-chip">${escapeHtml(item.category)}</span>` : ''}
       <h3>${escapeHtml(item.name)}</h3>
+      ${item.sku ? `<div class="sku-tag">كود: ${escapeHtml(item.sku)}</div>` : ''}
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
+      ${createdDate ? `<div class="color-name" style="margin-top:-6px;">تاريخ الإضافة: ${createdDate}</div>` : ''}
       <div class="row"><span>سعر الطقم</span><span>${fmt(item.price)}</span></div>
       <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
       <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>
+      ${isStagnant ? `<div class="row stagnant-warn"><span>⏳ راكد منذ</span><span>${stagnantDays} يوم</span></div>` : ''}
       <div class="actions">
+        <button class="link-btn" style="flex:1; text-align:center;" onclick='viewItemMovements(${JSON.stringify(item.id)}, ${JSON.stringify(item.name).replace(/'/g,"&apos;")})'>📋 الحركة</button>
+      </div>
+      <div class="actions edit-action">
         <button class="btn btn-outline btn-sm" onclick='openItemModal(${JSON.stringify(item).replace(/'/g,"&apos;")})'>تعديل</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}')">حذف</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}')">أرشفة</button>
       </div>
     </div>`;
   }).join('');
 }
 
+function openItemArchiveModal(){
+  const body = document.getElementById('itemArchiveBody');
+  const archived = items.filter(i=>i.archived);
+  if(archived.length===0){
+    body.innerHTML = `<div class="empty"><div class="big">🗄️</div>لا توجد أصناف مؤرشفة.</div>`;
+  }else{
+    body.innerHTML = archived.map(item=>`
+      <div class="item-card" style="margin-bottom:10px;">
+        <h3>${escapeHtml(item.name)}</h3>
+        <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
+        <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
+        <div class="actions edit-action">
+          <button class="btn btn-outline btn-sm" onclick="restoreItem('${item.id}'); openItemArchiveModal();">↩️ استعادة</button>
+          <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteItem('${item.id}'); openItemArchiveModal();">🗑 حذف نهائي</button>
+        </div>
+      </div>`).join('');
+  }
+  document.getElementById('itemArchiveModalOverlay').classList.add('active');
+}
+
+/* الانتقال لسجل الحركة مع فلترة على صنف معين */
+function viewItemMovements(itemId, itemName){
+  switchView('movements');
+  const filterInput = document.getElementById('movFilterItem');
+  if(filterInput) filterInput.value = itemName;
+  renderMovements();
+}
+function clearMovementFilters(){
+  ['movFilterItem','movFilterType','movFilterFrom','movFilterTo'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  renderMovements();
+}
+
+/* ===================== CSV EXPORT ===================== */
+function downloadCsv(filename, rows){
+  const csv = rows.map(r=> r.map(cell=>{
+    const s = (cell===null||cell===undefined) ? '' : String(cell);
+    return '"' + s.replace(/"/g,'""') + '"';
+  }).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportItemsCsv(){
+  const rows = [['الاسم','الفئة','الكود','اللون','قطع/طقم','السعر','الكمية بالمخزن','المنصرف','المتبقي','تاريخ الإضافة']];
+  items.filter(i=>!i.archived).forEach(i=>{
+    rows.push([i.name, i.category||'', i.sku||'', i.color||'', i.piecesCount, i.price, i.stockQty, issuedQtyFor(i.id), remainingQtyFor(i), itemCreatedDateStr(i)]);
+  });
+  downloadCsv('الأصناف.csv', rows);
+}
+
 function renderRemainingStock(){
   const grid = document.getElementById('remainingList');
-  if(items.length===0){
+  const activeItems = items.filter(i=>!i.archived);
+  if(activeItems.length===0){
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="big">📦</div>لا توجد أصناف بعد.</div>`;
     return;
   }
-  const sorted = [...items].sort((a,b)=> remainingQtyFor(a) - remainingQtyFor(b));
+  const sorted = [...activeItems].sort((a,b)=> remainingQtyFor(a) - remainingQtyFor(b));
   grid.innerHTML = sorted.map(item=>{
     const remaining = remainingQtyFor(item);
     const issued = issuedQtyFor(item.id);
@@ -1166,7 +1462,24 @@ function renderMovements(){
     tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
     return;
   }
-  tbody.innerHTML = stockMovements.map(m=>`
+  const itemFilter = (document.getElementById('movFilterItem')?.value||'').trim().toLowerCase();
+  const typeFilter = document.getElementById('movFilterType')?.value || '';
+  const fromFilter = document.getElementById('movFilterFrom')?.value || '';
+  const toFilter = document.getElementById('movFilterTo')?.value || '';
+
+  const filtered = stockMovements.filter(m=>{
+    if(itemFilter && !(m.itemName||'').toLowerCase().includes(itemFilter)) return false;
+    if(typeFilter && m.type !== typeFilter) return false;
+    if(fromFilter && m.date && m.date < fromFilter) return false;
+    if(toFilter && m.date && m.date > toFilter) return false;
+    return true;
+  });
+
+  if(filtered.length===0){
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(m=>`
     <tr>
       <td>${fmtDate(m.date)}</td>
       <td>${escapeHtml(m.itemName)}</td>
@@ -1223,7 +1536,7 @@ function renderArchived(){
       <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
       <div class="actions">
         <button class="btn btn-outline btn-sm" onclick='openArchivedStatementModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>📄 عرض التفاصيل</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteArchivedMerchantTx('${tx.id}')">🗑 حذف نهائي</button>
+        <button class="btn btn-danger btn-sm edit-action" onclick="deleteArchivedMerchantTx('${tx.id}')">🗑 حذف نهائي</button>
       </div>
     </div>
   `;}).join('');
@@ -1237,6 +1550,7 @@ function deleteArchivedMerchantTx(id){
 }
 
 function openArchivedStatementModal(tx){
+  currentStatementExport = null;
   const itemsAgg = {};
   (tx.items||[]).forEach(it=>{
     const key = (it.itemName||'') + '||' + (it.color||'');
@@ -1673,9 +1987,9 @@ function renderMerchants(){
           <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
           <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
           <div class="actions">
-            <button class="btn btn-outline btn-sm" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
+            <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
             <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
+            <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
           </div>
         </div>`;
       }).join('');
@@ -1719,9 +2033,9 @@ function renderMerchants(){
       <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
       <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
       <div class="actions">
-        <button class="btn btn-outline btn-sm" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
+        <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
         <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
+        <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
       </div>
     </div>
   `).join('');
@@ -1788,6 +2102,7 @@ function openStatementModal(merchantName){
     </div>
   `;
   document.getElementById('statementModalOverlay').classList.add('active');
+  currentStatementExport = {merchantName, txs, itemsAggList, allPayments, totalAll, paidAll, remainingAll};
 }
 
 function printStatement(){
@@ -1796,12 +2111,36 @@ function printStatement(){
   setTimeout(()=> document.body.classList.remove('printing-statement'), 300);
 }
 
+function exportCurrentStatementCsv(){
+  if(!currentStatementExport){ showToast('لا يوجد كشف حساب مفتوح'); return; }
+  const s = currentStatementExport;
+  const rows = [['كشف حساب', s.merchantName]];
+  rows.push([]);
+  rows.push(['العمليات']);
+  rows.push(['التاريخ','عدد الأصناف','الإجمالي','المدفوع','المتبقي']);
+  s.txs.forEach(t=> rows.push([fmtDate(t.date), (t.items||[]).length, t.total, t.paid, t.remaining]));
+  rows.push([]);
+  rows.push(['الأصناف المشتراة']);
+  rows.push(['الصنف','اللون','عدد الوحدات','الإجمالي']);
+  s.itemsAggList.forEach(a=> rows.push([a.itemName, a.color||'', a.qty, a.subtotal]));
+  rows.push([]);
+  rows.push(['الدفعات']);
+  rows.push(['التاريخ','المبلغ','ملاحظة']);
+  s.allPayments.forEach(p=> rows.push([fmtDate(p.date), p.amount, p.note||'']));
+  rows.push([]);
+  rows.push(['إجمالي كل العمليات', s.totalAll]);
+  rows.push(['إجمالي المدفوع', s.paidAll]);
+  rows.push(['المتبقي الإجمالي', s.remainingAll]);
+  downloadCsv('كشف حساب - ' + s.merchantName + '.csv', rows);
+}
+
 function renderDashboard(){
-  document.getElementById('statItemsCount').textContent = fmt(items.length);
-  const totalStock = items.reduce((s,i)=> s + (Number(i.stockQty)||0), 0);
-  const totalIssued = items.reduce((s,i)=> s + issuedQtyFor(i.id), 0);
+  const activeItems = items.filter(i=>!i.archived);
+  document.getElementById('statItemsCount').textContent = fmt(activeItems.length);
+  const totalStock = activeItems.reduce((s,i)=> s + (Number(i.stockQty)||0), 0);
+  const totalIssued = activeItems.reduce((s,i)=> s + issuedQtyFor(i.id), 0);
   const totalRemaining = totalStock - totalIssued;
-  const stockValue = items.reduce((s,i)=> s + (Number(i.stockQty)||0)*(Number(i.price)||0), 0);
+  const stockValue = activeItems.reduce((s,i)=> s + (Number(i.stockQty)||0)*(Number(i.price)||0), 0);
   const receivables = merchantTxs.reduce((s,t)=> s + (Number(t.remaining)||0), 0);
 
   document.getElementById('statTotalStock').textContent = fmt(totalStock);
@@ -1810,12 +2149,45 @@ function renderDashboard(){
   document.getElementById('statStockValue').textContent = fmt(stockValue);
   document.getElementById('statReceivables').textContent = fmt(receivables);
 
-  const low = items.filter(i=> remainingQtyFor(i) <= getAlertThreshold(i));
+  const low = items.filter(i=> !i.archived && remainingQtyFor(i) <= getAlertThreshold(i));
   const lowBox = document.getElementById('lowStockList');
   lowBox.innerHTML = low.length ? low.map(i=>`
     <div class="totals-box" style="margin-bottom:8px;">
       <div class="line"><span>${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''}</span><span style="color:var(--red); font-weight:800;">${fmt(remainingQtyFor(i))} متبقي</span></div>
     </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف منخفضة المخزون حالياً.</p>`;
+
+  const stagnant = getStagnantItems(30).sort((a,b)=> daysSince(lastIssuedDateFor(b.id)) - daysSince(lastIssuedDateFor(a.id))).slice(0,8);
+  const stagnantBox = document.getElementById('stagnantList');
+  if(stagnantBox){
+    stagnantBox.innerHTML = stagnant.length ? stagnant.map(i=>{
+      const d = daysSince(lastIssuedDateFor(i.id));
+      const label = d===Infinity ? 'لم يُصرف مطلقاً' : `منذ ${d} يوم`;
+      return `<div class="totals-box" style="margin-bottom:8px;">
+        <div class="line"><span>${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''}</span><span style="color:var(--gold-dark); font-weight:800;">${label}</span></div>
+      </div>`;
+    }).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف راكدة حالياً.</p>`;
+  }
+
+  const topItems = [...items].filter(i=>!i.archived).map(i=>({item:i, issued: issuedQtyFor(i.id)}))
+    .filter(x=>x.issued>0).sort((a,b)=> b.issued - a.issued).slice(0,5);
+  const topItemsBox = document.getElementById('topItemsList');
+  if(topItemsBox){
+    topItemsBox.innerHTML = topItems.length ? topItems.map(x=>`
+      <div class="totals-box" style="margin-bottom:8px;">
+        <div class="line"><span>${escapeHtml(x.item.name)} ${x.item.color?'- '+escapeHtml(x.item.color):''}</span><span style="color:var(--green); font-weight:800;">${fmt(x.issued)} منصرف</span></div>
+      </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد بيانات كافية بعد.</p>`;
+  }
+
+  const merchantRemaining = {};
+  merchantTxs.forEach(t=>{ merchantRemaining[t.merchantName] = (merchantRemaining[t.merchantName]||0) + (Number(t.remaining)||0); });
+  const topDebtors = Object.entries(merchantRemaining).filter(([,v])=>v>0).sort((a,b)=> b[1]-a[1]).slice(0,5);
+  const topDebtorsBox = document.getElementById('topDebtorsList');
+  if(topDebtorsBox){
+    topDebtorsBox.innerHTML = topDebtors.length ? topDebtors.map(([name,amount])=>`
+      <div class="totals-box" style="margin-bottom:8px;">
+        <div class="line"><span>${escapeHtml(name)}</span><span style="color:var(--red); font-weight:800;">${fmt(amount)}</span></div>
+      </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد مديونيات حالياً.</p>`;
+  }
 
   const recent = [...merchantTxs].slice(0,6);
   const tbody = document.querySelector('#recentMerchantsTable tbody');
