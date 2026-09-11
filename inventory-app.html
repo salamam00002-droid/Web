@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     color-scheme:light;
@@ -886,7 +887,7 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="printStatement()">🖨 طباعة</button>
       <button class="btn btn-outline" onclick="exportCurrentStatementCsv()">⬇️ تصدير CSV</button>
-      <button class="btn btn-outline" style="color:var(--green); border-color:var(--green);" onclick="sendStatementWhatsapp()">📱 إرسال واتساب</button>
+      <button class="btn btn-outline" style="color:var(--green); border-color:var(--green);" onclick="shareStatementImage()">📤 مشاركة الصورة</button>
       <button class="btn btn-outline" onclick="closeModal('statementModalOverlay')">إغلاق</button>
     </div>
   </div>
@@ -2311,18 +2312,64 @@ function normalizePhoneForWhatsapp(phone){
   return digits;
 }
 
-function sendStatementWhatsapp(){
-  if(!currentStatementExport){ showToast('لا يوجد كشف حساب مفتوح'); return; }
-  const s = currentStatementExport;
-  if(!s.phone){ showToast('لا يوجد رقم تليفون مسجل لهذا التاجر'); return; }
-  const waNumber = normalizePhoneForWhatsapp(s.phone);
-  const msg =
-    `كشف حساب: ${s.merchantName}\n` +
-    `عدد العمليات: ${s.txs.length}\n` +
-    `إجمالي كل العمليات: ${fmt(s.totalAll)}\n` +
-    `إجمالي المدفوع: ${fmt(s.paidAll)}\n` +
-    `المتبقي: ${fmt(s.remainingAll)}`;
-  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+/* يحوّل كشف الحساب المعروض إلى صورة PNG، ثم يفتح نافذة المشاركة
+   الأصلية للجهاز (تظهر فيها واتساب وباقي التطبيقات وكذلك خيار
+   الحفظ في الذاكرة/الملفات). يعمل على الموبايل (شير شيت أندرويد)
+   وعلى الديسكتوب (تنزيل الصورة مباشرة إذا لم تكن المشاركة مدعومة). */
+async function shareStatementImage(){
+  const area = document.getElementById('statementPrintArea');
+  if(!area){ showToast('لا يوجد كشف حساب مفتوح'); return; }
+  if(typeof html2canvas === 'undefined'){ showToast('تعذر تحميل أداة تصدير الصورة، تأكد من الاتصال بالإنترنت'); return; }
+
+  const titleText = (document.getElementById('statementTitle').textContent || 'كشف حساب').trim();
+  const fileName = (titleText.replace(/[\\/:*?"<>|]/g,'').trim() || 'كشف حساب') + '.png';
+
+  showToast('جارِ تجهيز الصورة...');
+  let canvas;
+  try{
+    if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
+    canvas = await html2canvas(area, {
+      backgroundColor:'#ffffff',
+      scale:2,
+      useCORS:true,
+      /* الصورة المُصدَّرة تُظهر دائماً ألوان الوضع النهاري الواضحة (كتابة كحلية على
+         خلفية بيضاء) بغض النظر عن كون التطبيق فى الوضع الليلي حالياً، لأن ألوان
+         الوضع الليلي فاتحة ومصممة لتظهر على خلفية داكنة، فتصبح شبه غير مرئية
+         فوق خلفية بيضاء */
+      onclone: function(clonedDoc){
+        clonedDoc.documentElement.classList.remove('dark-mode');
+        const clonedArea = clonedDoc.getElementById('statementPrintArea');
+        if(clonedArea){ clonedArea.style.color = '#1B2A4A'; clonedArea.style.background = '#ffffff'; }
+      }
+    });
+  }catch(err){
+    showToast('تعذر إنشاء الصورة: ' + err.message);
+    return;
+  }
+
+  canvas.toBlob(async function(blob){
+    if(!blob){ showToast('تعذر إنشاء الصورة'); return; }
+    const file = new File([blob], fileName, {type:'image/png'});
+
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title: titleText, text: titleText});
+        return;
+      }catch(err){
+        if(err && err.name === 'AbortError') return; /* المستخدم أغلق نافذة المشاركة */
+        /* تابع لخيار التنزيل الاحتياطي */
+      }
+    }
+
+    /* لا توجد نافذة مشاركة مدعومة (غالباً على الديسكتوب): نزّل الصورة
+       مباشرة حتى يستطيع المستخدم حفظها أو إرفاقها يدوياً فى واتساب */
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 4000);
+    showToast('تم حفظ صورة كشف الحساب، يمكنك الآن إرسالها من واتساب أو أي برنامج آخر');
+  }, 'image/png');
 }
 
 function renderDashboard(){
