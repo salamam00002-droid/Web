@@ -1073,8 +1073,16 @@ function isOverdue(tx){
   const today = new Date().toISOString().slice(0,10);
   return tx.dueDate < today;
 }
+function isDueToday(tx){
+  if(!tx.dueDate || Number(tx.remaining)<=0) return false;
+  const today = new Date().toISOString().slice(0,10);
+  return tx.dueDate === today;
+}
 function getOverdueTxs(){
   return merchantTxs.filter(isOverdue);
+}
+function getDueTodayTxs(){
+  return merchantTxs.filter(isDueToday);
 }
 function updateNotifications(){
   const badge = document.getElementById('notifBadge');
@@ -1082,8 +1090,9 @@ function updateNotifications(){
   if(!badge || !panel) return;
 
   const low = getLowStockItems();
+  const dueToday = getDueTodayTxs();
   const overdue = getOverdueTxs();
-  const count = low.length + overdue.length;
+  const count = low.length + dueToday.length + overdue.length;
 
   badge.textContent = count;
   badge.classList.toggle('show', count>0);
@@ -1096,6 +1105,10 @@ function updateNotifications(){
   if(low.length){
     html += `<div class="notif-section-title">📦 أصناف قاربت على النفاد</div>`;
     html += low.map(i=>`<div class="notif-item" onclick="switchView('remaining'); closeNotifPanel();">${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''} — متبقي ${fmt(remainingQtyFor(i))}</div>`).join('');
+  }
+  if(dueToday.length){
+    html += `<div class="notif-section-title">📅 دفعات يحين موعد استحقاقها اليوم</div>`;
+    html += dueToday.map(t=>`<div class="notif-item" onclick="switchView('merchants'); closeNotifPanel();">${escapeHtml(t.merchantName)} — متبقي ${fmt(t.remaining)} (يستحق اليوم ${fmtDate(t.dueDate)})</div>`).join('');
   }
   if(overdue.length){
     html += `<div class="notif-section-title">⚠️ دفعات متأخرة</div>`;
@@ -2083,7 +2096,7 @@ function openMerchantItemsModal(tx){
       <div class="m-row" style="align-items:center;">
         <div style="display:flex; align-items:center; gap:10px;">
           ${img
-            ? `<span class="item-icon-avatar" style="width:76px; height:76px; margin-inline-start:0; background-image:url('${img}')"></span>`
+            ? `<span class="item-icon-avatar" style="width:76px; height:76px; margin-inline-start:0; background-image:url('${img}'); cursor:pointer;" onclick='openLightbox(${JSON.stringify(img)}, ${JSON.stringify(it.itemName||'')})'></span>`
             : `<span class="item-icon-avatar item-icon-avatar--placeholder" style="width:76px; height:76px; margin-inline-start:0; font-size:28px;">🧳</span>`}
           <div>
             <div style="font-weight:800; font-size:14px;">${escapeHtml(it.itemName||'')}</div>
