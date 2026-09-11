@@ -25,6 +25,8 @@
     --green:#3E7A52;
     --radius:14px;
     --shadow:0 4px 18px rgba(27,42,74,0.08);
+    --solid:#1B2A4A;
+    --solid-hover:#2E3F63;
   }
   html.dark-mode{
     color-scheme:dark;
@@ -165,11 +167,11 @@
   /* ---------- buttons ---------- */
   button{font-family:'Tajawal',sans-serif;}
   .btn{
-    background:var(--ink); color:#fff; border:none; border-radius:10px;
+    background:var(--solid); color:#fff; border:none; border-radius:10px;
     padding:10px 18px; font-weight:700; font-size:14px; cursor:pointer;
     transition:.15s;
   }
-  .btn:hover{background:var(--ink-2);}
+  .btn:hover{background:var(--solid-hover);}
   .btn-gold{background:var(--gold); color:var(--ink);}
   .btn-gold:hover{background:var(--gold-dark); color:#fff;}
   .btn-outline{background:var(--paper); border:1px solid var(--line); color:var(--ink);}
@@ -402,7 +404,7 @@
   .helper a{color:var(--gold-dark);}
   .toast{
     position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
-    background:var(--ink); color:#fff; padding:11px 20px; border-radius:10px;
+    background:var(--solid); color:#fff; padding:11px 20px; border-radius:10px;
     font-size:13.5px; font-weight:700; z-index:200; box-shadow:var(--shadow);
     opacity:0; pointer-events:none; transition:.25s;
   }
