@@ -893,6 +893,25 @@
   </div>
 </div>
 
+<!-- ===== STATEMENT IMAGE PREVIEW MODAL ===== -->
+<div class="overlay" id="statementImageModalOverlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h3>صورة كشف الحساب</h3>
+      <button class="icon-btn" onclick="closeModal('statementImageModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <img id="statementImagePreviewImg" alt="صورة كشف الحساب" style="max-width:100%; border-radius:10px; border:1px solid var(--line);">
+      <p class="page-sub" style="margin-top:14px;">اضغط مطولاً على الصورة واختر "حفظ الصورة" أو "مشاركة" مباشرة، أو استخدم الأزرار بالأسفل.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" id="statementImageShareBtn" onclick="retryShareStatementImage()">📤 مشاركة</button>
+      <a class="btn btn-outline" id="statementImageDownloadLink" download="statement.png" href="#">⬇️ تنزيل</a>
+      <button class="btn btn-outline" onclick="closeModal('statementImageModalOverlay')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ===================== DARK MODE ===================== */
 function applyDarkMode(isDark){
@@ -2312,10 +2331,16 @@ function normalizePhoneForWhatsapp(phone){
   return digits;
 }
 
-/* يحوّل كشف الحساب المعروض إلى صورة PNG، ثم يفتح نافذة المشاركة
-   الأصلية للجهاز (تظهر فيها واتساب وباقي التطبيقات وكذلك خيار
-   الحفظ في الذاكرة/الملفات). يعمل على الموبايل (شير شيت أندرويد)
-   وعلى الديسكتوب (تنزيل الصورة مباشرة إذا لم تكن المشاركة مدعومة). */
+let lastStatementImage = null; /* {blob, dataUrl, fileName, titleText} آخر صورة كشف حساب تم تجهيزها */
+
+/* يحوّل كشف الحساب المعروض إلى صورة PNG، ثم يعرضها فى نافذة معاينة
+   بدلاً من محاولة حفظها/مشاركتها تلقائياً: التنزيل التلقائي داخل تطبيق
+   الأندرويد (WebView) لا يصل فعلياً لذاكرة الجهاز غالباً لأنه لا يوجد
+   مُتحكّم تنزيل مسجَّل فى التطبيق، كما أن نافذة المشاركة الأصلية قد
+   تفشل صامتة لو تأخر تجهيز الصورة قليلاً (الجهاز يشترط أن تُفتح خلال
+   لمسة المستخدم مباشرة). لذلك تظهر الصورة على الشاشة ليقوم المستخدم
+   بحفظها بالضغط المطوّل عليها (يعمل تلقائياً على أندرويد) أو بالضغط
+   على زر "مشاركة" (لمسة جديدة فعلية) أو زر "تنزيل" (يعمل على الديسكتوب). */
 async function shareStatementImage(){
   const area = document.getElementById('statementPrintArea');
   if(!area){ showToast('لا يوجد كشف حساب مفتوح'); return; }
@@ -2347,29 +2372,41 @@ async function shareStatementImage(){
     return;
   }
 
-  canvas.toBlob(async function(blob){
-    if(!blob){ showToast('تعذر إنشاء الصورة'); return; }
-    const file = new File([blob], fileName, {type:'image/png'});
-
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file], title: titleText, text: titleText});
-        return;
-      }catch(err){
-        if(err && err.name === 'AbortError') return; /* المستخدم أغلق نافذة المشاركة */
-        /* تابع لخيار التنزيل الاحتياطي */
-      }
-    }
-
-    /* لا توجد نافذة مشاركة مدعومة (غالباً على الديسكتوب): نزّل الصورة
-       مباشرة حتى يستطيع المستخدم حفظها أو إرفاقها يدوياً فى واتساب */
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=> URL.revokeObjectURL(url), 4000);
-    showToast('تم حفظ صورة كشف الحساب، يمكنك الآن إرسالها من واتساب أو أي برنامج آخر');
+  const dataUrl = canvas.toDataURL('image/png');
+  canvas.toBlob(function(blob){
+    lastStatementImage = {blob, dataUrl, fileName, titleText};
+    openStatementImagePreview();
   }, 'image/png');
+}
+
+function openStatementImagePreview(){
+  if(!lastStatementImage) return;
+  const img = document.getElementById('statementImagePreviewImg');
+  img.src = lastStatementImage.dataUrl;
+  const link = document.getElementById('statementImageDownloadLink');
+  link.href = lastStatementImage.dataUrl;
+  link.download = lastStatementImage.fileName;
+  const shareBtn = document.getElementById('statementImageShareBtn');
+  shareBtn.style.display = (navigator.share) ? '' : 'none';
+  document.getElementById('statementImageModalOverlay').classList.add('active');
+}
+
+/* زر "مشاركة" داخل نافذة المعاينة: يُستدعى مباشرة من ضغطة المستخدم
+   (لمسة جديدة فعلية)، لذا يعمل مع navigator.share بشكل موثوق أكثر من
+   محاولة استدعائها تلقائياً بعد انتهاء تجهيز الصورة */
+async function retryShareStatementImage(){
+  if(!lastStatementImage || !lastStatementImage.blob){ showToast('لا توجد صورة جاهزة'); return; }
+  try{
+    const file = new File([lastStatementImage.blob], lastStatementImage.fileName, {type:'image/png'});
+    if(navigator.canShare && !navigator.canShare({files:[file]})){
+      showToast('المشاركة المباشرة غير مدعومة هنا، اضغط مطولاً على الصورة أو استخدم زر التنزيل');
+      return;
+    }
+    await navigator.share({files:[file], title: lastStatementImage.titleText, text: lastStatementImage.titleText});
+  }catch(err){
+    if(err && err.name === 'AbortError') return; /* المستخدم أغلق نافذة المشاركة بنفسه */
+    showToast('تعذرت المشاركة: ' + err.message);
+  }
 }
 
 function renderDashboard(){
