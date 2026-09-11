@@ -2318,12 +2318,37 @@ function sendStatementWhatsapp(){
   const s = currentStatementExport;
   if(!s.phone){ showToast('لا يوجد رقم تليفون مسجل لهذا التاجر'); return; }
   const waNumber = normalizePhoneForWhatsapp(s.phone);
-  const msg =
-    `كشف حساب: ${s.merchantName}\n` +
-    `عدد العمليات: ${s.txs.length}\n` +
+
+  let msg = `*كشف حساب: ${s.merchantName}*\n\n`;
+
+  msg += `*العمليات*\n`;
+  s.txs.forEach(t=>{
+    msg += `${fmtDate(t.date)} — أصناف: ${(t.items||[]).length} — الإجمالي: ${fmt(t.total)} — المدفوع: ${fmt(t.paid)} — المتبقي: ${fmt(t.remaining)}\n`;
+  });
+
+  msg += `\n*الأصناف المشتراة*\n`;
+  if(s.itemsAggList.length){
+    s.itemsAggList.forEach(a=>{
+      msg += `${a.itemName}${a.color? ' - '+a.color : ''} — عدد: ${fmt(a.qty)} — الإجمالي: ${fmt(a.subtotal)}\n`;
+    });
+  } else {
+    msg += `لا توجد أصناف.\n`;
+  }
+
+  msg += `\n*الدفعات*\n`;
+  if(s.allPayments.length){
+    s.allPayments.forEach(p=>{
+      msg += `${fmtDate(p.date)} — ${fmt(p.amount)}${p.note? ' — '+p.note : ''}\n`;
+    });
+  } else {
+    msg += `لا توجد دفعات مسجلة.\n`;
+  }
+
+  msg += `\n*الإجماليات*\n` +
     `إجمالي كل العمليات: ${fmt(s.totalAll)}\n` +
     `إجمالي المدفوع: ${fmt(s.paidAll)}\n` +
-    `المتبقي: ${fmt(s.remainingAll)}`;
+    `المتبقي الإجمالي: ${fmt(s.remainingAll)}`;
+
   window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
