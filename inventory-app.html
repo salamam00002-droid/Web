@@ -10,7 +10,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     color-scheme:light;
@@ -887,27 +886,8 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="printStatement()">🖨 طباعة</button>
       <button class="btn btn-outline" onclick="exportCurrentStatementCsv()">⬇️ تصدير CSV</button>
-      <button class="btn btn-outline" style="color:var(--green); border-color:var(--green);" onclick="shareStatementImage()">📤 مشاركة الصورة</button>
+      <button class="btn btn-outline" style="color:var(--green); border-color:var(--green);" onclick="sendStatementWhatsapp()">📱 إرسال واتساب</button>
       <button class="btn btn-outline" onclick="closeModal('statementModalOverlay')">إغلاق</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== STATEMENT IMAGE PREVIEW MODAL ===== -->
-<div class="overlay" id="statementImageModalOverlay">
-  <div class="modal" style="max-width:520px;">
-    <div class="modal-head">
-      <h3>صورة كشف الحساب</h3>
-      <button class="icon-btn" onclick="closeModal('statementImageModalOverlay')">✕</button>
-    </div>
-    <div class="modal-body" style="text-align:center;">
-      <img id="statementImagePreviewImg" alt="صورة كشف الحساب" style="max-width:100%; border-radius:10px; border:1px solid var(--line);">
-      <p class="page-sub" style="margin-top:14px;">اضغط مطولاً على الصورة واختر "حفظ الصورة" أو "مشاركة" مباشرة، أو استخدم الأزرار بالأسفل.</p>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-gold" id="statementImageShareBtn" onclick="retryShareStatementImage()">📤 مشاركة</button>
-      <a class="btn btn-outline" id="statementImageDownloadLink" download="statement.png" href="#">⬇️ تنزيل</a>
-      <button class="btn btn-outline" onclick="closeModal('statementImageModalOverlay')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -2331,82 +2311,18 @@ function normalizePhoneForWhatsapp(phone){
   return digits;
 }
 
-let lastStatementImage = null; /* {blob, dataUrl, fileName, titleText} آخر صورة كشف حساب تم تجهيزها */
-
-/* يحوّل كشف الحساب المعروض إلى صورة PNG، ثم يعرضها فى نافذة معاينة
-   بدلاً من محاولة حفظها/مشاركتها تلقائياً: التنزيل التلقائي داخل تطبيق
-   الأندرويد (WebView) لا يصل فعلياً لذاكرة الجهاز غالباً لأنه لا يوجد
-   مُتحكّم تنزيل مسجَّل فى التطبيق، كما أن نافذة المشاركة الأصلية قد
-   تفشل صامتة لو تأخر تجهيز الصورة قليلاً (الجهاز يشترط أن تُفتح خلال
-   لمسة المستخدم مباشرة). لذلك تظهر الصورة على الشاشة ليقوم المستخدم
-   بحفظها بالضغط المطوّل عليها (يعمل تلقائياً على أندرويد) أو بالضغط
-   على زر "مشاركة" (لمسة جديدة فعلية) أو زر "تنزيل" (يعمل على الديسكتوب). */
-async function shareStatementImage(){
-  const area = document.getElementById('statementPrintArea');
-  if(!area){ showToast('لا يوجد كشف حساب مفتوح'); return; }
-  if(typeof html2canvas === 'undefined'){ showToast('تعذر تحميل أداة تصدير الصورة، تأكد من الاتصال بالإنترنت'); return; }
-
-  const titleText = (document.getElementById('statementTitle').textContent || 'كشف حساب').trim();
-  const fileName = (titleText.replace(/[\\/:*?"<>|]/g,'').trim() || 'كشف حساب') + '.png';
-
-  showToast('جارِ تجهيز الصورة...');
-  let canvas;
-  try{
-    if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
-    canvas = await html2canvas(area, {
-      backgroundColor:'#ffffff',
-      scale:2,
-      useCORS:true,
-      /* الصورة المُصدَّرة تُظهر دائماً ألوان الوضع النهاري الواضحة (كتابة كحلية على
-         خلفية بيضاء) بغض النظر عن كون التطبيق فى الوضع الليلي حالياً، لأن ألوان
-         الوضع الليلي فاتحة ومصممة لتظهر على خلفية داكنة، فتصبح شبه غير مرئية
-         فوق خلفية بيضاء */
-      onclone: function(clonedDoc){
-        clonedDoc.documentElement.classList.remove('dark-mode');
-        const clonedArea = clonedDoc.getElementById('statementPrintArea');
-        if(clonedArea){ clonedArea.style.color = '#1B2A4A'; clonedArea.style.background = '#ffffff'; }
-      }
-    });
-  }catch(err){
-    showToast('تعذر إنشاء الصورة: ' + err.message);
-    return;
-  }
-
-  const dataUrl = canvas.toDataURL('image/png');
-  canvas.toBlob(function(blob){
-    lastStatementImage = {blob, dataUrl, fileName, titleText};
-    openStatementImagePreview();
-  }, 'image/png');
-}
-
-function openStatementImagePreview(){
-  if(!lastStatementImage) return;
-  const img = document.getElementById('statementImagePreviewImg');
-  img.src = lastStatementImage.dataUrl;
-  const link = document.getElementById('statementImageDownloadLink');
-  link.href = lastStatementImage.dataUrl;
-  link.download = lastStatementImage.fileName;
-  const shareBtn = document.getElementById('statementImageShareBtn');
-  shareBtn.style.display = (navigator.share) ? '' : 'none';
-  document.getElementById('statementImageModalOverlay').classList.add('active');
-}
-
-/* زر "مشاركة" داخل نافذة المعاينة: يُستدعى مباشرة من ضغطة المستخدم
-   (لمسة جديدة فعلية)، لذا يعمل مع navigator.share بشكل موثوق أكثر من
-   محاولة استدعائها تلقائياً بعد انتهاء تجهيز الصورة */
-async function retryShareStatementImage(){
-  if(!lastStatementImage || !lastStatementImage.blob){ showToast('لا توجد صورة جاهزة'); return; }
-  try{
-    const file = new File([lastStatementImage.blob], lastStatementImage.fileName, {type:'image/png'});
-    if(navigator.canShare && !navigator.canShare({files:[file]})){
-      showToast('المشاركة المباشرة غير مدعومة هنا، اضغط مطولاً على الصورة أو استخدم زر التنزيل');
-      return;
-    }
-    await navigator.share({files:[file], title: lastStatementImage.titleText, text: lastStatementImage.titleText});
-  }catch(err){
-    if(err && err.name === 'AbortError') return; /* المستخدم أغلق نافذة المشاركة بنفسه */
-    showToast('تعذرت المشاركة: ' + err.message);
-  }
+function sendStatementWhatsapp(){
+  if(!currentStatementExport){ showToast('لا يوجد كشف حساب مفتوح'); return; }
+  const s = currentStatementExport;
+  if(!s.phone){ showToast('لا يوجد رقم تليفون مسجل لهذا التاجر'); return; }
+  const waNumber = normalizePhoneForWhatsapp(s.phone);
+  const msg =
+    `كشف حساب: ${s.merchantName}\n` +
+    `عدد العمليات: ${s.txs.length}\n` +
+    `إجمالي كل العمليات: ${fmt(s.totalAll)}\n` +
+    `إجمالي المدفوع: ${fmt(s.paidAll)}\n` +
+    `المتبقي: ${fmt(s.remainingAll)}`;
+  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function renderDashboard(){
