@@ -307,6 +307,8 @@
   .sku-tag{font-size:11px; color:var(--muted); font-family:'Cairo',sans-serif; margin-bottom:6px;}
   .stagnant-warn{color:var(--gold-dark)!important;}
 
+  /* ---------- read-only mode ---------- */
+  .read-only-mode .edit-action{display:none !important;}
   .notif-item{font-size:12.5px; padding:8px; border-radius:8px; cursor:pointer; line-height:1.6;}
   .notif-item:hover{background:var(--cream);}
   .notif-empty{font-size:12.5px; color:var(--muted); padding:16px 10px; text-align:center;}
@@ -568,7 +570,7 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" onclick="exportItemsCsv()">⬇️ تصدير CSV</button>
         <button class="btn btn-outline btn-sm" onclick="openItemArchiveModal()">🗄️ الأرشيف (<span id="itemArchiveCount">0</span>)</button>
-        <button class="btn btn-gold" onclick="openItemModal()">+ إضافة صنف</button>
+        <button class="btn btn-gold edit-action" onclick="openItemModal()">+ إضافة صنف</button>
       </div>
     </div>
 
@@ -656,7 +658,7 @@
         <div class="page-title">التجار</div>
         <div class="page-sub">تسجيل ما أخذه كل تاجر من الأصناف، والدفعات والمتبقي</div>
       </div>
-      <button class="btn btn-gold" onclick="openMerchantModal()">+ عملية جديدة</button>
+      <button class="btn btn-gold edit-action" onclick="openMerchantModal()">+ عملية جديدة</button>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
@@ -720,9 +722,13 @@
           <label>كود الصنف SKU (اختياري)</label>
           <input id="itemSku" placeholder="مثال: BAG-A-001">
         </div>
-        <div class="field">
-          <label>اللون</label>
-          <input id="itemColor" placeholder="مثال: أزرق كحلي">
+        <div class="field" style="grid-column:1 / -1;">
+          <label>الألوان (يمكن إضافة أكثر من لون)</label>
+          <div style="display:flex; gap:8px;">
+            <input id="itemColorInput" placeholder="مثال: أزرق كحلي" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addItemColorChip();}">
+            <button type="button" class="btn btn-outline btn-sm" onclick="addItemColorChip()">+ إضافة لون</button>
+          </div>
+          <div id="itemColorsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
         </div>
         <div class="field">
           <label>عدد القطع بالطقم</label>
@@ -768,7 +774,7 @@
         <p class="page-sub" style="margin-bottom:12px;">
           هذه العملية تحذف كل البيانات الحالية فى قاعدة البيانات نهائياً وتستبدلها بمحتوى الملف الذى تختاره. تأكد أنك تملك نسخة من البيانات الحالية قبل المتابعة إن احتجتها.
         </p>
-        <button class="btn btn-outline" style="width:100%; border-color:var(--red); color:var(--red);" onclick="triggerImportBackup()">📥 اختيار ملف واستعادة (استبدال كامل)</button>
+        <button class="btn btn-outline edit-action" style="width:100%; border-color:var(--red); color:var(--red);" onclick="triggerImportBackup()">📥 اختيار ملف واستعادة (استبدال كامل)</button>
       </div>
     </div>
     <div class="modal-foot">
@@ -906,9 +912,42 @@ function toggleDarkMode(){
 }
 applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
 
+/* ===================== وضع القراءة فقط (حماية بسيطة من التعديل غير المقصود) =====================
+   ملاحظة: هذه حماية على مستوى المتصفح فقط للمنع من الأخطاء العرضية، وليست نظام صلاحيات حقيقي
+   يمنع أشخاصاً آخرين من الوصول للبيانات؛ لصلاحيات حقيقية متعددة المستخدمين يلزم تفعيل Firebase Authentication. */
+function isReadOnlyMode(){ return document.body.classList.contains('read-only-mode'); }
+function setReadOnlyMode(on){
+  document.body.classList.toggle('read-only-mode', on);
+  localStorage.setItem('invapp_readonly_active', on ? '1' : '0');
+  const btn = document.getElementById('readOnlyToggle');
+  if(btn) btn.textContent = on ? '🔒' : '🔓';
+}
+function toggleReadOnlyMode(){
+  if(isReadOnlyMode()){
+    const pin = localStorage.getItem('invapp_readonly_pin') || '';
+    const entered = prompt('أدخل كلمة المرور لإلغاء وضع القراءة فقط:');
+    if(entered===null) return;
+    if(pin && entered !== pin){ showToast('كلمة مرور غير صحيحة'); return; }
+    setReadOnlyMode(false);
+    showToast('تم إلغاء وضع القراءة فقط');
+  }else{
+    let pin = localStorage.getItem('invapp_readonly_pin') || '';
+    if(!pin){
+      const newPin = prompt('لأول مرة: اختر كلمة مرور ستحتاجها لاحقاً لإلغاء وضع القراءة فقط:');
+      if(newPin===null) return;
+      if(!newPin.trim()){ showToast('يجب اختيار كلمة مرور'); return; }
+      localStorage.setItem('invapp_readonly_pin', newPin.trim());
+    }
+    setReadOnlyMode(true);
+    showToast('تم تفعيل وضع القراءة فقط — أزرار الإضافة والتعديل والحذف مخفية الآن');
+  }
+}
+setReadOnlyMode(localStorage.getItem('invapp_readonly_active') === '1');
+
 /* ===================== STATE ===================== */
 let db = null;
-let items = [];      // {id, name, color, piecesCount, price, stockQty, alertThreshold}
+let items = [];      // {id, name, color, colors, piecesCount, price, stockQty, alertThreshold}
+let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف
 let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
 let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
@@ -1132,7 +1171,9 @@ function openItemModal(item){
   document.getElementById('itemName').value = item ? item.name : '';
   document.getElementById('itemCategory').value = item ? (item.category||'') : '';
   document.getElementById('itemSku').value = item ? (item.sku||'') : '';
-  document.getElementById('itemColor').value = item ? item.color : '';
+  itemColorsList = item ? (Array.isArray(item.colors) && item.colors.length ? item.colors.slice() : (item.color ? [item.color] : [])) : [];
+  document.getElementById('itemColorInput').value = '';
+  renderItemColorsChips();
   document.getElementById('itemPieces').value = item ? item.piecesCount : 3;
   document.getElementById('itemPrice').value = item ? item.price : '';
   document.getElementById('itemStock').value = item ? item.stockQty : 0;
@@ -1142,6 +1183,31 @@ function openItemModal(item){
   document.getElementById('itemModalOverlay').classList.add('active');
 }
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+
+/* ===================== ITEM COLORS (multi-color chips) ===================== */
+function renderItemColorsChips(){
+  const box = document.getElementById('itemColorsChips');
+  if(!box) return;
+  box.innerHTML = itemColorsList.length ? itemColorsList.map((c,idx)=>`
+    <span class="category-chip" style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px;">
+      ${escapeHtml(c)}
+      <span onclick="removeItemColorChip(${idx})" style="cursor:pointer; font-weight:800;">✕</span>
+    </span>
+  `).join('') : '<span class="page-sub" style="margin:0;">لم تتم إضافة أى لون بعد</span>';
+}
+function addItemColorChip(){
+  const input = document.getElementById('itemColorInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(!itemColorsList.some(c=> c.toLowerCase()===val.toLowerCase())) itemColorsList.push(val);
+  input.value = '';
+  renderItemColorsChips();
+  input.focus();
+}
+function removeItemColorChip(idx){
+  itemColorsList.splice(idx,1);
+  renderItemColorsChips();
+}
 
 /* ===================== ITEM IMAGE (upload + resize + preview) ===================== */
 function setItemImagePreview(dataUrl){
@@ -1203,7 +1269,8 @@ function saveItem(){
   const name = document.getElementById('itemName').value.trim();
   const category = document.getElementById('itemCategory').value.trim();
   const sku = document.getElementById('itemSku').value.trim();
-  const color = document.getElementById('itemColor').value.trim();
+  const colors = itemColorsList.slice();
+  const color = colors.join('، ');
   const piecesCount = Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
   const stockQty = Number(document.getElementById('itemStock').value)||0;
@@ -1213,7 +1280,7 @@ function saveItem(){
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
-  const payload = { name, category, sku, color, piecesCount, price, stockQty, alertThreshold, image };
+  const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold, image };
   const today = new Date().toISOString().slice(0,10);
 
   if(id){
@@ -1354,7 +1421,7 @@ function renderItems(){
       <div class="actions">
         <button class="link-btn" style="flex:1; text-align:center;" onclick='viewItemMovements(${JSON.stringify(item.id)}, ${JSON.stringify(item.name).replace(/'/g,"&apos;")})'>📋 الحركة</button>
       </div>
-      <div class="actions">
+      <div class="actions edit-action">
         <button class="btn btn-outline btn-sm" onclick='openItemModal(${JSON.stringify(item).replace(/'/g,"&apos;")})'>تعديل</button>
         <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}')">أرشفة</button>
       </div>
@@ -1373,7 +1440,7 @@ function openItemArchiveModal(){
         <h3>${escapeHtml(item.name)}</h3>
         <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
         <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
-        <div class="actions">
+        <div class="actions edit-action">
           <button class="btn btn-outline btn-sm" onclick="restoreItem('${item.id}'); openItemArchiveModal();">↩️ استعادة</button>
           <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteItem('${item.id}'); openItemArchiveModal();">🗑 حذف نهائي</button>
         </div>
@@ -1685,7 +1752,7 @@ function renderArchived(){
       <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
       <div class="actions">
         <button class="btn btn-outline btn-sm" onclick='openArchivedStatementModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>📄 عرض التفاصيل</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteArchivedMerchantTx('${tx.id}')">🗑 حذف نهائي</button>
+        <button class="btn btn-danger btn-sm edit-action" onclick="deleteArchivedMerchantTx('${tx.id}')">🗑 حذف نهائي</button>
       </div>
     </div>
   `;}).join('');
@@ -1775,7 +1842,7 @@ function populateMerchantItemSelects(){
   document.querySelectorAll('.merchant-item-select').forEach(sel=>{
     const current = sel.value;
     sel.innerHTML = '<option value="">اختر الصنف</option>' + items.map(it=>
-      `<option value="${it.id}" data-price="${it.price}" data-color="${escapeHtml(it.color||'')}">${escapeHtml(it.name)} ${it.color? '- '+escapeHtml(it.color):''}</option>`
+      `<option value="${it.id}" data-price="${it.price}" data-color="${escapeHtml(it.color||'')}">${escapeHtml(it.name)}</option>`
     ).join('');
     if(current) sel.value = current;
   });
@@ -1791,6 +1858,9 @@ function addMerchantItemRow(existing){
     <div class="merchant-item-thumb mi-thumb" id="thumb_${rowId}">🧳</div>
     <div class="mi-name">
       <select class="merchant-item-select" onchange="onMerchantItemSelect('${rowId}')"></select>
+      <div class="mi-color-wrap" style="display:none; margin-top:6px;">
+        <select class="merchant-item-color-select" onchange="recalcMerchantTotals()" style="width:100%;"></select>
+      </div>
     </div>
     <div class="mi-qty">
       <input type="number" min="1" class="merchant-item-qty" placeholder="الكمية" value="${existing?existing.qty:1}" oninput="recalcMerchantTotals()">
@@ -1806,6 +1876,7 @@ function addMerchantItemRow(existing){
   if(existing){
     wrap.querySelector('.merchant-item-select').value = existing.itemId;
     updateMerchantRowThumb(rowId, existing.itemId);
+    updateMerchantRowColorSelect(rowId, existing.itemId, existing.color);
   }
   recalcMerchantTotals();
 }
@@ -1840,7 +1911,28 @@ function onMerchantItemSelect(rowId){
   const price = opt ? opt.getAttribute('data-price') : '';
   if(price) row.querySelector('.merchant-item-price').value = price;
   updateMerchantRowThumb(rowId, sel.value);
+  updateMerchantRowColorSelect(rowId, sel.value);
   recalcMerchantTotals();
+}
+
+/* يظهر قائمة منسدلة لاختيار اللون فقط إذا كان للصنف أكثر من لون مسجل */
+function updateMerchantRowColorSelect(rowId, itemId, preselectColor){
+  const row = document.getElementById(rowId);
+  if(!row) return;
+  const wrap = row.querySelector('.mi-color-wrap');
+  const colorSel = row.querySelector('.merchant-item-color-select');
+  const itemObj = items.find(i=>i.id===itemId);
+  const colors = itemObj && Array.isArray(itemObj.colors) ? itemObj.colors : [];
+  if(colors.length > 1){
+    colorSel.innerHTML = '<option value="">اختر اللون</option>' + colors.map(c=>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+    ).join('');
+    if(preselectColor && colors.includes(preselectColor)) colorSel.value = preselectColor;
+    wrap.style.display = 'block';
+  }else{
+    colorSel.innerHTML = '';
+    wrap.style.display = 'none';
+  }
 }
 
 function recalcMerchantTotals(){
@@ -1929,10 +2021,18 @@ function saveMerchantTx(){
     const unitPrice = Number(row.querySelector('.merchant-item-price').value)||0;
     if(!itemId || qty<=0) continue;
     const itemObj = items.find(i=>i.id===itemId);
+    const colorWrap = row.querySelector('.mi-color-wrap');
+    const colorSel = row.querySelector('.merchant-item-color-select');
+    const hasColorChoice = colorWrap && colorWrap.style.display !== 'none';
+    if(hasColorChoice && !colorSel.value){
+      showToast('من فضلك اختر لون الصنف: ' + (itemObj?itemObj.name:''));
+      return;
+    }
+    const chosenColor = hasColorChoice ? colorSel.value : (itemObj?itemObj.color:'');
     const subtotal = qty*unitPrice;
     total += subtotal;
     txItems.push({
-      itemId, itemName: itemObj?itemObj.name:'', color: itemObj?itemObj.color:'',
+      itemId, itemName: itemObj?itemObj.name:'', color: chosenColor,
       qty, unitPrice, subtotal
     });
   }
@@ -2136,9 +2236,9 @@ function renderMerchants(){
           <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
           <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
           <div class="actions">
-            <button class="btn btn-outline btn-sm" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
+            <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
             <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
+            <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
           </div>
         </div>`;
       }).join('');
@@ -2182,9 +2282,9 @@ function renderMerchants(){
       <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
       <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
       <div class="actions">
-        <button class="btn btn-outline btn-sm" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
+        <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
         <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
+        <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
       </div>
     </div>
   `).join('');
