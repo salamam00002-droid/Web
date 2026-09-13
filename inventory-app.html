@@ -307,8 +307,6 @@
   .sku-tag{font-size:11px; color:var(--muted); font-family:'Cairo',sans-serif; margin-bottom:6px;}
   .stagnant-warn{color:var(--gold-dark)!important;}
 
-  /* ---------- read-only mode ---------- */
-  .read-only-mode .edit-action{display:none !important;}
   .notif-item{font-size:12.5px; padding:8px; border-radius:8px; cursor:pointer; line-height:1.6;}
   .notif-item:hover{background:var(--cream);}
   .notif-empty{font-size:12.5px; color:var(--muted); padding:16px 10px; text-align:center;}
@@ -911,38 +909,6 @@ function toggleDarkMode(){
   applyDarkMode(isDark);
 }
 applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
-
-/* ===================== وضع القراءة فقط (حماية بسيطة من التعديل غير المقصود) =====================
-   ملاحظة: هذه حماية على مستوى المتصفح فقط للمنع من الأخطاء العرضية، وليست نظام صلاحيات حقيقي
-   يمنع أشخاصاً آخرين من الوصول للبيانات؛ لصلاحيات حقيقية متعددة المستخدمين يلزم تفعيل Firebase Authentication. */
-function isReadOnlyMode(){ return document.body.classList.contains('read-only-mode'); }
-function setReadOnlyMode(on){
-  document.body.classList.toggle('read-only-mode', on);
-  localStorage.setItem('invapp_readonly_active', on ? '1' : '0');
-  const btn = document.getElementById('readOnlyToggle');
-  if(btn) btn.textContent = on ? '🔒' : '🔓';
-}
-function toggleReadOnlyMode(){
-  if(isReadOnlyMode()){
-    const pin = localStorage.getItem('invapp_readonly_pin') || '';
-    const entered = prompt('أدخل كلمة المرور لإلغاء وضع القراءة فقط:');
-    if(entered===null) return;
-    if(pin && entered !== pin){ showToast('كلمة مرور غير صحيحة'); return; }
-    setReadOnlyMode(false);
-    showToast('تم إلغاء وضع القراءة فقط');
-  }else{
-    let pin = localStorage.getItem('invapp_readonly_pin') || '';
-    if(!pin){
-      const newPin = prompt('لأول مرة: اختر كلمة مرور ستحتاجها لاحقاً لإلغاء وضع القراءة فقط:');
-      if(newPin===null) return;
-      if(!newPin.trim()){ showToast('يجب اختيار كلمة مرور'); return; }
-      localStorage.setItem('invapp_readonly_pin', newPin.trim());
-    }
-    setReadOnlyMode(true);
-    showToast('تم تفعيل وضع القراءة فقط — أزرار الإضافة والتعديل والحذف مخفية الآن');
-  }
-}
-setReadOnlyMode(localStorage.getItem('invapp_readonly_active') === '1');
 
 /* ===================== STATE ===================== */
 let db = null;
