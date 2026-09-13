@@ -553,12 +553,7 @@
     <div id="topDebtorsList" class="card"></div>
 
     <div class="section-head"><h2>آخر عمليات التجار</h2></div>
-    <div class="card" style="overflow-x:auto;">
-      <table id="recentMerchantsTable">
-        <thead><tr><th>التاجر</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <div id="recentMerchantsList"></div>
   </div>
 
   <!-- ========== ITEMS VIEW ========== -->
@@ -2464,16 +2459,18 @@ function renderDashboard(){
   }
 
   const recent = [...merchantTxs].slice(0,6);
-  const tbody = document.querySelector('#recentMerchantsTable tbody');
-  tbody.innerHTML = recent.length ? recent.map(tx=>`
-    <tr>
-      <td>${escapeHtml(tx.merchantName)}</td>
-      <td>${fmtDate(tx.date)}</td>
-      <td class="money">${fmt(tx.total)}</td>
-      <td class="money">${fmt(tx.paid)}</td>
-      <td class="money">${fmt(tx.remaining)}</td>
-      <td><span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span></td>
-    </tr>`).join('') : `<tr><td colspan="6"><div class="empty">لا توجد عمليات بعد.</div></td></tr>`;
+  const recentBox = document.getElementById('recentMerchantsList');
+  recentBox.innerHTML = recent.length ? recent.map(tx=>`
+    <div class="merchant-card">
+      <div class="merchant-card-head">
+        <div><h3>${escapeHtml(tx.merchantName)}</h3></div>
+        <span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span>
+      </div>
+      <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
+      <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
+      <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
+      <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
+    </div>`).join('') : `<div class="card"><div class="empty">لا توجد عمليات بعد.</div></div>`;
 }
 
 /* ===================== BOOT ===================== */
