@@ -365,7 +365,7 @@
   .empty .big{font-size:38px; margin-bottom:10px;}
 
   .merchant-item-row{
-    display:grid; grid-template-columns:auto 2fr 1fr 1fr 1fr auto; gap:8px; align-items:center;
+    display:grid; grid-template-columns:auto 2fr 1fr 1fr 1fr 1fr auto; gap:8px; align-items:center;
     padding:8px 0; border-bottom:1px dashed var(--line);
   }
   .merchant-item-row .sub{font-size:11.5px; color:var(--muted);}
@@ -412,7 +412,8 @@
       grid-template-columns: 1fr 1fr 1fr;
       grid-template-areas:
         "thumb name name"
-        "qty price subtotal"
+        "qty price discount"
+        "subtotal subtotal subtotal"
         "del del del";
       gap:8px;
     }
@@ -421,10 +422,12 @@
     .merchant-item-row .mi-name .merchant-item-select{width:100%;}
     .merchant-item-row .mi-qty{grid-area:qty;}
     .merchant-item-row .mi-price{grid-area:price;}
+    .merchant-item-row .mi-discount{grid-area:discount;}
     .merchant-item-row .mi-subtotal{grid-area:subtotal; text-align:center;}
     .merchant-item-row .mi-del{grid-area:del; justify-self:end;}
     header{padding:14px 16px;}
   }
+  .merchant-item-price[readonly]{background:var(--cream); cursor:not-allowed; opacity:.85;}
 
   /* ---------- توحيد حجم ووزن الخط في كل الكروت والفورمات والحقول لتحسين وضوح القراءة ---------- */
   .item-card, .item-card *,
@@ -914,7 +917,8 @@ applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
 let db = null;
 let items = [];      // {id, name, color, colors, piecesCount, price, stockQty, alertThreshold}
 let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف
-let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
+let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,discount,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
+// discount: خصم خاص بهذا التاجر على سعر الوحدة لهذا الصنف فقط فى هذه العملية (subtotal = qty * (unitPrice - discount))
 let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
@@ -1832,7 +1836,10 @@ function addMerchantItemRow(existing){
       <input type="number" min="1" class="merchant-item-qty" placeholder="الكمية" value="${existing?existing.qty:1}" oninput="recalcMerchantTotals()">
     </div>
     <div class="mi-price">
-      <input type="number" min="0" step="0.01" class="merchant-item-price" placeholder="سعر الوحدة" value="${existing?existing.unitPrice:''}" oninput="recalcMerchantTotals()">
+      <input type="number" min="0" step="0.01" class="merchant-item-price" placeholder="سعر الوحدة" value="${existing?existing.unitPrice:''}" readonly tabindex="-1">
+    </div>
+    <div class="mi-discount">
+      <input type="number" min="0" step="0.01" class="merchant-item-discount" placeholder="خصم" value="${existing&&existing.discount?existing.discount:''}" oninput="recalcMerchantTotals()">
     </div>
     <div class="sub merchant-item-subtotal mi-subtotal">0</div>
     <button class="icon-btn mi-del" onclick="removeMerchantItemRow('${rowId}')">🗑</button>
@@ -1906,7 +1913,9 @@ function recalcMerchantTotals(){
   document.querySelectorAll('.merchant-item-row').forEach(row=>{
     const qty = Number(row.querySelector('.merchant-item-qty').value)||0;
     const price = Number(row.querySelector('.merchant-item-price').value)||0;
-    const subtotal = qty*price;
+    const discount = Number(row.querySelector('.merchant-item-discount').value)||0;
+    const netPrice = Math.max(0, price-discount);
+    const subtotal = qty*netPrice;
     row.querySelector('.merchant-item-subtotal').textContent = fmt(subtotal);
     total += subtotal;
   });
@@ -1985,6 +1994,7 @@ function saveMerchantTx(){
     const itemId = sel.value;
     const qty = Number(row.querySelector('.merchant-item-qty').value)||0;
     const unitPrice = Number(row.querySelector('.merchant-item-price').value)||0;
+    const discount = Number(row.querySelector('.merchant-item-discount').value)||0;
     if(!itemId || qty<=0) continue;
     const itemObj = items.find(i=>i.id===itemId);
     const colorWrap = row.querySelector('.mi-color-wrap');
@@ -1995,11 +2005,12 @@ function saveMerchantTx(){
       return;
     }
     const chosenColor = hasColorChoice ? colorSel.value : (itemObj?itemObj.color:'');
-    const subtotal = qty*unitPrice;
+    const netPrice = Math.max(0, unitPrice-discount);
+    const subtotal = qty*netPrice;
     total += subtotal;
     txItems.push({
       itemId, itemName: itemObj?itemObj.name:'', color: chosenColor,
-      qty, unitPrice, subtotal
+      qty, unitPrice, discount, subtotal
     });
   }
   if(txItems.length===0){ showToast('أضف صنفاً واحداً على الأقل بكمية صحيحة'); return; }
@@ -2132,7 +2143,7 @@ function openMerchantItemsModal(tx){
             : `<span class="item-icon-avatar item-icon-avatar--placeholder" style="width:76px; height:76px; margin-inline-start:0; font-size:28px;">🧳</span>`}
           <div>
             <div style="font-weight:800; font-size:14px;">${escapeHtml(it.itemName||'')}</div>
-            <div style="font-size:12px; color:var(--muted);">${escapeHtml(it.color||'—')} · الكمية: ${fmt(it.qty)}</div>
+            <div style="font-size:12px; color:var(--muted);">${escapeHtml(it.color||'—')} · الكمية: ${fmt(it.qty)}${Number(it.discount)>0 ? ' · خصم: '+fmt(it.discount) : ''}</div>
           </div>
         </div>
         <span>${fmt(it.subtotal)}</span>
@@ -2416,7 +2427,7 @@ function renderDashboard(){
   const lowBox = document.getElementById('lowStockList');
   lowBox.innerHTML = low.length ? low.map(i=>`
     <div class="totals-box" style="margin-bottom:8px;">
-      <div class="line"><span>${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''}</span><span style="color:var(--red); font-weight:800;">${fmt(remainingQtyFor(i))} متبقي</span></div>
+      <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:var(--red); font-weight:800;">${fmt(remainingQtyFor(i))} متبقي</span></div>
     </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف منخفضة المخزون حالياً.</p>`;
 
   const stagnant = getStagnantItems(30).sort((a,b)=> daysSince(lastIssuedDateFor(b.id)) - daysSince(lastIssuedDateFor(a.id))).slice(0,8);
@@ -2426,7 +2437,7 @@ function renderDashboard(){
       const d = daysSince(lastIssuedDateFor(i.id));
       const label = d===Infinity ? 'لم يُصرف مطلقاً' : `منذ ${d} يوم`;
       return `<div class="totals-box" style="margin-bottom:8px;">
-        <div class="line"><span>${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''}</span><span style="color:var(--gold-dark); font-weight:800;">${label}</span></div>
+        <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:var(--gold-dark); font-weight:800;">${label}</span></div>
       </div>`;
     }).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف راكدة حالياً.</p>`;
   }
@@ -2437,7 +2448,7 @@ function renderDashboard(){
   if(topItemsBox){
     topItemsBox.innerHTML = topItems.length ? topItems.map(x=>`
       <div class="totals-box" style="margin-bottom:8px;">
-        <div class="line"><span>${escapeHtml(x.item.name)} ${x.item.color?'- '+escapeHtml(x.item.color):''}</span><span style="color:var(--green); font-weight:800;">${fmt(x.issued)} منصرف</span></div>
+        <div class="line"><span>${escapeHtml(x.item.name)}</span><span style="color:var(--green); font-weight:800;">${fmt(x.issued)} منصرف</span></div>
       </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد بيانات كافية بعد.</p>`;
   }
 
