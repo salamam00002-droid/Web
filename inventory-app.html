@@ -1079,7 +1079,7 @@ function updateNotifications(){
   let html = '';
   if(low.length){
     html += `<div class="notif-section-title">📦 أصناف قاربت على النفاد</div>`;
-    html += low.map(i=>`<div class="notif-item" onclick="switchView('remaining'); closeNotifPanel();">${escapeHtml(i.name)} ${i.color?'- '+escapeHtml(i.color):''} — متبقي ${fmt(remainingQtyFor(i))}</div>`).join('');
+    html += low.map(i=>`<div class="notif-item" onclick="switchView('remaining'); closeNotifPanel();">${escapeHtml(i.name)} — متبقي ${fmt(remainingQtyFor(i))}</div>`).join('');
   }
   if(dueToday.length){
     html += `<div class="notif-section-title">📅 دفعات يحين موعد استحقاقها اليوم</div>`;
