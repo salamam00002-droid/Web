@@ -304,6 +304,14 @@
   .filters-row .field.grow2{flex:2;}
   .link-btn{background:none; border:none; color:var(--gold-dark); font-weight:700; font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;}
   .category-chip{display:inline-block; background:var(--cream); border:1px solid var(--line); color:var(--muted); font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; margin-inline-end:6px;}
+  .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
+  .color-qty-chip input{width:56px; padding:3px 6px; font-size:12px; border-radius:14px; text-align:center;}
+  .color-qty-chip .cq-x{cursor:pointer; font-weight:800; color:var(--muted); padding:0 2px;}
+  .color-qty-chip .cq-x:hover{color:var(--red);}
+  .color-stock-mini{margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);}
+  .color-stock-mini .row{padding:3px 0; font-size:12.5px;}
+  .color-stock-mini .row span:first-child{color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .color-stock-mini .row span:last-child{font-weight:800; font-size:13px;}
   .sku-tag{font-size:11px; color:var(--muted); font-family:'Cairo',sans-serif; margin-bottom:6px;}
   .stagnant-warn{color:var(--gold-dark)!important;}
 
@@ -540,17 +548,8 @@
       <div class="stat-card warn"><div class="label">مبالغ مستحقة على التجار</div><div class="value" id="statReceivables">0</div></div>
     </div>
 
-    <div class="section-head"><h2>أصناف على وشك النفاد</h2></div>
-    <div id="lowStockList" class="card"></div>
-
-    <div class="section-head"><h2>⏳ أصناف راكدة (لم تُصرف منذ 30 يوماً أو أكثر)</h2></div>
-    <div id="stagnantList" class="card"></div>
-
-    <div class="section-head"><h2>🔥 الأكثر طلباً</h2></div>
-    <div id="topItemsList" class="card"></div>
-
-    <div class="section-head"><h2>💰 أكبر مديونية عند التجار</h2></div>
-    <div id="topDebtorsList" class="card"></div>
+    <div class="section-head"><h2>📦 جرد المتبقي بالمخزن (لكل صنف بألوانه)</h2></div>
+    <div id="stockAuditList" class="card"></div>
 
     <div class="section-head"><h2>آخر عمليات التجار</h2></div>
     <div id="recentMerchantsList"></div>
@@ -719,12 +718,14 @@
           <input id="itemSku" placeholder="مثال: BAG-A-001">
         </div>
         <div class="field" style="grid-column:1 / -1;">
-          <label>الألوان (يمكن إضافة أكثر من لون)</label>
+          <label>الألوان والكمية لكل لون (يمكن إضافة أكثر من لون)</label>
           <div style="display:flex; gap:8px;">
-            <input id="itemColorInput" placeholder="مثال: أزرق كحلي" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addItemColorChip();}">
+            <input id="itemColorInput" placeholder="مثال: روز" style="flex:1.4;" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('itemColorQtyInput').focus();}">
+            <input id="itemColorQtyInput" type="number" min="0" placeholder="الكمية" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addItemColorChip();}">
             <button type="button" class="btn btn-outline btn-sm" onclick="addItemColorChip()">+ إضافة لون</button>
           </div>
           <div id="itemColorsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+          <p class="helper" style="margin-top:6px;">هذا الحقل يعرض دائماً العدد الفعلي المتبقي بالمخزن الآن (بعد خصم المصروف للتجار)، ويُحسب تلقائياً من مجموع كميات الألوان المتبقية عند إضافة لون بكمية.</p>
         </div>
         <div class="field">
           <label>عدد القطع بالطقم</label>
@@ -735,7 +736,7 @@
           <input id="itemPrice" type="number" min="0" step="0.01">
         </div>
         <div class="field">
-          <label>الكمية بالمخزن (عدد الأطقم)</label>
+          <label>الكمية الفعلية المتبقية بالمخزن الآن (عدد الأطقم)</label>
           <input id="itemStock" type="number" min="0" value="0">
         </div>
         <div class="field">
@@ -910,8 +911,9 @@ applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
 
 /* ===================== STATE ===================== */
 let db = null;
-let items = [];      // {id, name, color, colors, piecesCount, price, stockQty, alertThreshold}
-let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف
+let items = [];      // {id, name, color, colors, colorStock:{colorName:qty}, piecesCount, price, stockQty, alertThreshold}
+let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف، كل عنصر {name, qty}
+let itemColorsManaged = false; // true إذا كان المستخدم بدأ يُدخل كمية لكل لون، فتُحسب الكمية الإجمالية تلقائياً
 let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,discount,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
 // discount: خصم خاص بهذا التاجر على سعر الوحدة لهذا الصنف فقط فى هذه العملية (subtotal = qty * (unitPrice - discount))
 let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
@@ -1116,6 +1118,24 @@ function issuedQtyFor(itemId){
 function remainingQtyFor(item){
   return (Number(item.stockQty)||0) - issuedQtyFor(item.id);
 }
+/* المنصرف من لون معين لصنف معين (يعتمد على اللون المسجل في كل عملية تاجر) */
+function issuedQtyForColor(itemId, colorName){
+  let sum = 0;
+  merchantTxs.forEach(tx=>{
+    (tx.items||[]).forEach(it=>{
+      if(it.itemId === itemId && (it.color||'') === colorName) sum += Number(it.qty)||0;
+    });
+  });
+  return sum;
+}
+/* المتبقي بالمخزن من لون معين لصنف معين (يعمل فقط إذا كان للصنف كميات مسجلة لكل لون) */
+function remainingQtyForColor(item, colorName){
+  const stock = (item.colorStock && item.colorStock[colorName]!==undefined) ? Number(item.colorStock[colorName])||0 : 0;
+  return stock - issuedQtyForColor(item.id, colorName);
+}
+function hasColorStock(item){
+  return !!(item && item.colorStock && Object.keys(item.colorStock).length>0);
+}
 
 /* ===================== ITEMS: FIRESTORE ===================== */
 function listenToItems(){
@@ -1136,12 +1156,20 @@ function openItemModal(item){
   document.getElementById('itemName').value = item ? item.name : '';
   document.getElementById('itemCategory').value = item ? (item.category||'') : '';
   document.getElementById('itemSku').value = item ? (item.sku||'') : '';
-  itemColorsList = item ? (Array.isArray(item.colors) && item.colors.length ? item.colors.slice() : (item.color ? [item.color] : [])) : [];
+  const colorNames = item ? (Array.isArray(item.colors) && item.colors.length ? item.colors.slice() : (item.color ? [item.color] : [])) : [];
+  itemColorsManaged = !!(item && item.colorStock && typeof item.colorStock === 'object');
+  /* نعرض العدد الفعلي المتبقي بالمخزن الآن (بعد خصم المصروف) وليس الرصيد الأصلي وقت الإضافة */
+  itemColorsList = colorNames.map(c=> {
+    const hasQty = item && item.colorStock && item.colorStock[c]!==undefined;
+    return {name: c, qty: hasQty ? remainingQtyForColor(item, c) : 0};
+  });
   document.getElementById('itemColorInput').value = '';
+  document.getElementById('itemColorQtyInput').value = '';
   renderItemColorsChips();
   document.getElementById('itemPieces').value = item ? item.piecesCount : 3;
   document.getElementById('itemPrice').value = item ? item.price : '';
-  document.getElementById('itemStock').value = item ? item.stockQty : 0;
+  document.getElementById('itemStock').value = item ? remainingQtyFor(item) : 0;
+  syncItemStockFromColors();
   document.getElementById('itemAlertThreshold').value = (item && item.alertThreshold!==null && item.alertThreshold!==undefined) ? item.alertThreshold : '';
   document.getElementById('itemImageFile').value = '';
   setItemImagePreview(item && item.image ? item.image : '');
@@ -1149,29 +1177,59 @@ function openItemModal(item){
 }
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 
-/* ===================== ITEM COLORS (multi-color chips) ===================== */
+/* ===================== ITEM COLORS (multi-color chips + quantity per color) ===================== */
 function renderItemColorsChips(){
   const box = document.getElementById('itemColorsChips');
   if(!box) return;
   box.innerHTML = itemColorsList.length ? itemColorsList.map((c,idx)=>`
-    <span class="category-chip" style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px;">
-      ${escapeHtml(c)}
-      <span onclick="removeItemColorChip(${idx})" style="cursor:pointer; font-weight:800;">✕</span>
+    <span class="color-qty-chip">
+      ${escapeHtml(c.name)}
+      <input type="number" min="0" value="${c.qty||0}" oninput="updateItemColorQty(${idx}, this.value)" onclick="event.stopPropagation()">
+      <span class="cq-x" onclick="removeItemColorChip(${idx})">✕</span>
     </span>
   `).join('') : '<span class="page-sub" style="margin:0;">لم تتم إضافة أى لون بعد</span>';
 }
 function addItemColorChip(){
   const input = document.getElementById('itemColorInput');
+  const qtyInput = document.getElementById('itemColorQtyInput');
   const val = input.value.trim();
   if(!val) return;
-  if(!itemColorsList.some(c=> c.toLowerCase()===val.toLowerCase())) itemColorsList.push(val);
+  const qtyRaw = qtyInput.value;
+  const qty = qtyRaw==='' ? 0 : (Number(qtyRaw)||0);
+  if(qtyRaw!=='') itemColorsManaged = true;
+  if(!itemColorsList.some(c=> c.name.toLowerCase()===val.toLowerCase())) itemColorsList.push({name: val, qty});
   input.value = '';
+  qtyInput.value = '';
   renderItemColorsChips();
+  syncItemStockFromColors();
   input.focus();
 }
 function removeItemColorChip(idx){
   itemColorsList.splice(idx,1);
   renderItemColorsChips();
+  syncItemStockFromColors();
+}
+function updateItemColorQty(idx, val){
+  if(!itemColorsList[idx]) return;
+  itemColorsList[idx].qty = Number(val)||0;
+  itemColorsManaged = true;
+  syncItemStockFromColors();
+}
+/* الكمية الإجمالية بالمخزن تُحسب تلقائياً من مجموع كميات الألوان مادام المستخدم بدأ يُدخل كميات لكل لون */
+function syncItemStockFromColors(){
+  const stockInput = document.getElementById('itemStock');
+  if(!stockInput) return;
+  if(itemColorsList.length>0 && itemColorsManaged){
+    const total = itemColorsList.reduce((s,c)=> s + (Number(c.qty)||0), 0);
+    stockInput.value = total;
+    stockInput.readOnly = true;
+    stockInput.style.background = 'var(--cream)';
+    stockInput.title = 'محسوبة تلقائياً من مجموع كميات الألوان';
+  }else{
+    stockInput.readOnly = false;
+    stockInput.style.background = '';
+    stockInput.title = '';
+  }
 }
 
 /* ===================== ITEM IMAGE (upload + resize + preview) ===================== */
@@ -1234,11 +1292,19 @@ function saveItem(){
   const name = document.getElementById('itemName').value.trim();
   const category = document.getElementById('itemCategory').value.trim();
   const sku = document.getElementById('itemSku').value.trim();
-  const colors = itemColorsList.slice();
+  const colors = itemColorsList.map(c=> c.name);
   const color = colors.join('، ');
   const piecesCount = Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
-  const stockQty = Number(document.getElementById('itemStock').value)||0;
+  const usingColorStock = itemColorsList.length>0 && itemColorsManaged;
+  /* الحقول المدخلة هنا (الكمية الإجمالية / كمية كل لون) تمثل العدد الفعلي المتبقي بالمخزن الآن،
+     فنعيد إضافة ما تم صرفه فعلياً للتجار حتى الآن لنحصل على الرصيد الإجمالي الصحيح المخزَّن،
+     بحيث يظهر المتبقي = القيمة التي أدخلها المستخدم بالضبط */
+  const colorStock = {};
+  if(usingColorStock) itemColorsList.forEach(c=> colorStock[c.name] = (Number(c.qty)||0) + issuedQtyForColor(id, c.name));
+  const stockQty = usingColorStock
+    ? Object.values(colorStock).reduce((s,v)=> s + v, 0)
+    : ((Number(document.getElementById('itemStock').value)||0) + issuedQtyFor(id));
   const alertThresholdRaw = document.getElementById('itemAlertThreshold').value;
   const alertThreshold = alertThresholdRaw==='' ? null : Number(alertThresholdRaw);
   const image = document.getElementById('itemImageData').value || '';
@@ -1246,6 +1312,8 @@ function saveItem(){
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
   const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold, image };
+  if(usingColorStock) payload.colorStock = colorStock;
+  else if(id) payload.colorStock = firebase.firestore.FieldValue.delete();
   const today = new Date().toISOString().slice(0,10);
 
   if(id){
@@ -1379,9 +1447,8 @@ function renderItems(){
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
       ${createdDate ? `<div class="color-name" style="margin-top:-6px;">تاريخ الإضافة: ${createdDate}</div>` : ''}
       <div class="row"><span>سعر الطقم</span><span>${fmt(item.price)}</span></div>
-      <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
+      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 إجمالي القطع بالمخزن</span><span>${fmt(remaining)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
-      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>
       ${isStagnant ? `<div class="row stagnant-warn"><span>⏳ راكد منذ</span><span>${stagnantDays} يوم</span></div>` : ''}
       <div class="actions">
         <button class="link-btn" style="flex:1; text-align:center;" onclick='viewItemMovements(${JSON.stringify(item.id)}, ${JSON.stringify(item.name).replace(/'/g,"&apos;")})'>📋 الحركة</button>
@@ -1590,6 +1657,13 @@ function renderRemainingStock(){
       <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
       <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>
+      ${hasColorStock(item) ? `
+      <div class="color-stock-mini">
+        ${Object.keys(item.colorStock).map(c=>{
+          const remC = remainingQtyForColor(item, c);
+          return `<div class="row"><span><span class="swatch" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}</span><span style="${remC<=0?'color:var(--red);':''}">${fmt(remC)} متبقي</span></div>`;
+        }).join('')}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -2418,44 +2492,23 @@ function renderDashboard(){
   document.getElementById('statStockValue').textContent = fmt(stockValue);
   document.getElementById('statReceivables').textContent = fmt(receivables);
 
-  const low = items.filter(i=> !i.archived && remainingQtyFor(i) <= getAlertThreshold(i));
-  const lowBox = document.getElementById('lowStockList');
-  lowBox.innerHTML = low.length ? low.map(i=>`
-    <div class="totals-box" style="margin-bottom:8px;">
-      <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:var(--red); font-weight:800;">${fmt(remainingQtyFor(i))} متبقي</span></div>
-    </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف منخفضة المخزون حالياً.</p>`;
-
-  const stagnant = getStagnantItems(30).sort((a,b)=> daysSince(lastIssuedDateFor(b.id)) - daysSince(lastIssuedDateFor(a.id))).slice(0,8);
-  const stagnantBox = document.getElementById('stagnantList');
-  if(stagnantBox){
-    stagnantBox.innerHTML = stagnant.length ? stagnant.map(i=>{
-      const d = daysSince(lastIssuedDateFor(i.id));
-      const label = d===Infinity ? 'لم يُصرف مطلقاً' : `منذ ${d} يوم`;
+  const auditItems = [...activeItems].sort((a,b)=> (a.name||'').localeCompare(b.name||'','ar'));
+  const auditBox = document.getElementById('stockAuditList');
+  if(auditBox){
+    auditBox.innerHTML = auditItems.length ? auditItems.map(i=>{
+      const remaining = remainingQtyFor(i);
+      const colorRows = hasColorStock(i) ? Object.keys(i.colorStock).map(c=>{
+        const remC = remainingQtyForColor(i, c);
+        return `<div class="line" style="font-size:12.5px; padding:3px 0 3px 16px;">
+          <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:${colorToHex(c)}; border:1px solid rgba(0,0,0,.15); vertical-align:middle; margin-left:6px;"></span>${escapeHtml(c)}</span>
+          <span style="font-size:14px; color:${remC<=0?'var(--red)':'var(--ink-2)'};">${fmt(remC)}</span>
+        </div>`;
+      }).join('') : '';
       return `<div class="totals-box" style="margin-bottom:8px;">
-        <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:var(--gold-dark); font-weight:800;">${label}</span></div>
+        <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:${remaining<=0?'var(--red)':'var(--ink)'};">${fmt(remaining)} متبقي</span></div>
+        ${colorRows}
       </div>`;
-    }).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف راكدة حالياً.</p>`;
-  }
-
-  const topItems = [...items].filter(i=>!i.archived).map(i=>({item:i, issued: issuedQtyFor(i.id)}))
-    .filter(x=>x.issued>0).sort((a,b)=> b.issued - a.issued).slice(0,5);
-  const topItemsBox = document.getElementById('topItemsList');
-  if(topItemsBox){
-    topItemsBox.innerHTML = topItems.length ? topItems.map(x=>`
-      <div class="totals-box" style="margin-bottom:8px;">
-        <div class="line"><span>${escapeHtml(x.item.name)}</span><span style="color:var(--green); font-weight:800;">${fmt(x.issued)} منصرف</span></div>
-      </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد بيانات كافية بعد.</p>`;
-  }
-
-  const merchantRemaining = {};
-  merchantTxs.forEach(t=>{ merchantRemaining[t.merchantName] = (merchantRemaining[t.merchantName]||0) + (Number(t.remaining)||0); });
-  const topDebtors = Object.entries(merchantRemaining).filter(([,v])=>v>0).sort((a,b)=> b[1]-a[1]).slice(0,5);
-  const topDebtorsBox = document.getElementById('topDebtorsList');
-  if(topDebtorsBox){
-    topDebtorsBox.innerHTML = topDebtors.length ? topDebtors.map(([name,amount])=>`
-      <div class="totals-box" style="margin-bottom:8px;">
-        <div class="line"><span>${escapeHtml(name)}</span><span style="color:var(--red); font-weight:800;">${fmt(amount)}</span></div>
-      </div>`).join('') : `<p class="page-sub" style="margin:0;">لا توجد مديونيات حالياً.</p>`;
+    }).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف بعد.</p>`;
   }
 
   const recent = [...merchantTxs].slice(0,6);
