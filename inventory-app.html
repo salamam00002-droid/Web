@@ -309,6 +309,13 @@
   .color-qty-chip .cq-x{cursor:pointer; font-weight:800; color:var(--muted); padding:0 2px;}
   .color-qty-chip .cq-x:hover{color:var(--red);}
   .color-stock-mini{margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);}
+  .color-remain-chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);}
+  .color-remain-chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--cream); border:1px solid var(--line);
+    border-radius:8px; padding:4px 9px; font-size:12.5px; font-weight:700; color:var(--ink-2); white-space:nowrap;
+  }
+  .color-remain-chip .dot{width:9px; height:9px; border-radius:3px; flex:none; border:1px solid rgba(0,0,0,.15);}
+  .color-remain-chip b{font-size:14px; font-family:'Cairo',sans-serif;}
   .color-stock-mini .row{padding:3px 0; font-size:12.5px;}
   .color-stock-mini .row span:first-child{color:var(--muted); display:flex; align-items:center; gap:6px;}
   .color-stock-mini .row span:last-child{font-weight:800; font-size:13px;}
@@ -739,10 +746,6 @@
           <label>الكمية الفعلية المتبقية بالمخزن الآن (عدد الأطقم)</label>
           <input id="itemStock" type="number" min="0" value="0">
         </div>
-        <div class="field">
-          <label>حد التنبيه (اختياري)</label>
-          <input id="itemAlertThreshold" type="number" min="0" placeholder="افتراضي: 10% من الكمية (وحد أدنى 2)">
-        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1170,7 +1173,6 @@ function openItemModal(item){
   document.getElementById('itemPrice').value = item ? item.price : '';
   document.getElementById('itemStock').value = item ? remainingQtyFor(item) : 0;
   syncItemStockFromColors();
-  document.getElementById('itemAlertThreshold').value = (item && item.alertThreshold!==null && item.alertThreshold!==undefined) ? item.alertThreshold : '';
   document.getElementById('itemImageFile').value = '';
   setItemImagePreview(item && item.image ? item.image : '');
   document.getElementById('itemModalOverlay').classList.add('active');
@@ -1305,13 +1307,11 @@ function saveItem(){
   const stockQty = usingColorStock
     ? Object.values(colorStock).reduce((s,v)=> s + v, 0)
     : ((Number(document.getElementById('itemStock').value)||0) + issuedQtyFor(id));
-  const alertThresholdRaw = document.getElementById('itemAlertThreshold').value;
-  const alertThreshold = alertThresholdRaw==='' ? null : Number(alertThresholdRaw);
   const image = document.getElementById('itemImageData').value || '';
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
-  const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold, image };
+  const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold: null, image };
   if(usingColorStock) payload.colorStock = colorStock;
   else if(id) payload.colorStock = firebase.firestore.FieldValue.delete();
   const today = new Date().toISOString().slice(0,10);
@@ -2497,13 +2497,12 @@ function renderDashboard(){
   if(auditBox){
     auditBox.innerHTML = auditItems.length ? auditItems.map(i=>{
       const remaining = remainingQtyFor(i);
-      const colorRows = hasColorStock(i) ? Object.keys(i.colorStock).map(c=>{
+      const colorRows = hasColorStock(i) ? `<div class="color-remain-chips">` + Object.keys(i.colorStock).map(c=>{
         const remC = remainingQtyForColor(i, c);
-        return `<div class="line" style="font-size:12.5px; padding:3px 0 3px 16px;">
-          <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:${colorToHex(c)}; border:1px solid rgba(0,0,0,.15); vertical-align:middle; margin-left:6px;"></span>${escapeHtml(c)}</span>
-          <span style="font-size:14px; color:${remC<=0?'var(--red)':'var(--ink-2)'};">${fmt(remC)}</span>
-        </div>`;
-      }).join('') : '';
+        return `<span class="color-remain-chip" style="${remC<=0?'color:var(--red);':''}">
+          <span class="dot" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}: <b>${fmt(remC)}</b>
+        </span>`;
+      }).join('') + `</div>` : '';
       return `<div class="totals-box" style="margin-bottom:8px;">
         <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:${remaining<=0?'var(--red)':'var(--ink)'};">${fmt(remaining)} متبقي</span></div>
         ${colorRows}
