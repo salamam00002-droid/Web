@@ -381,7 +381,13 @@
 
   .merchant-item-row{
     display:grid; grid-template-columns:auto 2fr 1fr 1fr 1fr 1fr auto; gap:8px; align-items:center;
-    padding:8px 0; border-bottom:1px dashed var(--line);
+    padding:12px; margin-bottom:10px;
+    border:2px solid var(--ink);
+    border-radius:12px;
+    background:var(--paper);
+  }
+  html.dark-mode .merchant-item-row{
+    border-color:var(--ink-2);
   }
   .merchant-item-row .sub{font-size:11.5px; color:var(--muted);}
   .merchant-item-thumb{
@@ -431,6 +437,8 @@
         "subtotal subtotal subtotal"
         "del del del";
       gap:8px;
+      padding:12px;
+      margin-bottom:10px;
     }
     .merchant-item-row .mi-thumb{grid-area:thumb;}
     .merchant-item-row .mi-name{grid-area:name; min-width:0;}
@@ -1913,7 +1921,12 @@ function addMerchantItemRow(existing){
     <div class="sub merchant-item-subtotal mi-subtotal">0</div>
     <button class="icon-btn mi-del" onclick="removeMerchantItemRow('${rowId}')">🗑</button>
   `;
-  document.getElementById('merchantItemsList').appendChild(wrap);
+  const list = document.getElementById('merchantItemsList');
+  if(existing){
+    list.appendChild(wrap);
+  } else {
+    list.insertBefore(wrap, list.firstChild);
+  }
   populateMerchantItemSelects();
   if(existing){
     wrap.querySelector('.merchant-item-select').value = existing.itemId;
