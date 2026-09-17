@@ -2497,12 +2497,36 @@ function renderDashboard(){
   if(auditBox){
     auditBox.innerHTML = auditItems.length ? auditItems.map(i=>{
       const remaining = remainingQtyFor(i);
-      const colorRows = hasColorStock(i) ? `<div class="color-remain-chips">` + Object.keys(i.colorStock).map(c=>{
-        const remC = remainingQtyForColor(i, c);
-        return `<span class="color-remain-chip" style="${remC<=0?'color:var(--red);':''}">
-          <span class="dot" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}: <b>${fmt(remC)}</b>
-        </span>`;
-      }).join('') + `</div>` : '';
+      let colorRows = '';
+      if(hasColorStock(i)){
+        const allColors = Object.keys(i.colorStock);
+        const availableColors = allColors.filter(c => remainingQtyForColor(i, c) > 0);
+        const zeroColors = allColors.filter(c => remainingQtyForColor(i, c) <= 0);
+        const makeChip = (c, isZero) => {
+          const remC = remainingQtyForColor(i, c);
+          return `<span class="color-remain-chip" style="${isZero?'opacity:0.55;':''}">
+            <span class="dot" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}: <b style="${isZero?'color:var(--red);':''}">${fmt(remC)}</b>
+          </span>`;
+        };
+        let html = '';
+        if(availableColors.length){
+          html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);">
+            <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:5px;">✅ متبقي</div>
+            <div class="color-remain-chips" style="margin-top:0; padding-top:0; border-top:none;">
+              ${availableColors.map(c=>makeChip(c,false)).join('')}
+            </div>
+          </div>`;
+        }
+        if(zeroColors.length){
+          html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);">
+            <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:5px;">❌ خلصت</div>
+            <div class="color-remain-chips" style="margin-top:0; padding-top:0; border-top:none;">
+              ${zeroColors.map(c=>makeChip(c,true)).join('')}
+            </div>
+          </div>`;
+        }
+        colorRows = html;
+      }
       return `<div class="totals-box" style="margin-bottom:8px;">
         <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:${remaining<=0?'var(--red)':'var(--ink)'};">${fmt(remaining)} متبقي</span></div>
         ${colorRows}
