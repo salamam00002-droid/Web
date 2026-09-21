@@ -380,22 +380,47 @@
   .empty .big{font-size:38px; margin-bottom:10px;}
 
   .merchant-item-row{
-    display:grid; grid-template-columns:auto 2fr 1fr 1fr 1fr 1fr auto; gap:8px; align-items:center;
-    padding:12px; margin-bottom:10px;
+    display:flex; flex-direction:column;
+    margin-bottom:12px;
     border:2px solid var(--ink);
-    border-radius:12px;
+    border-radius:14px;
     background:var(--paper);
+    overflow:hidden;
   }
-  html.dark-mode .merchant-item-row{
-    border-color:var(--ink-2);
+  html.dark-mode .merchant-item-row{ border-color:var(--ink-2); }
+  .mi-row1{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 12px 10px;
+    border-bottom:1px dashed var(--line);
   }
-  .merchant-item-row .sub{font-size:11.5px; color:var(--muted);}
+  .mi-row1 .mi-name{ flex:1; min-width:0; }
+  .mi-row2{
+    display:grid;
+    grid-template-columns:1.4fr 0.7fr 1fr 1fr auto;
+    gap:8px; align-items:end;
+    padding:10px 12px 12px;
+    background:var(--cream);
+  }
+  html.dark-mode .mi-row2{ background:var(--cream); }
+  .mi-field{ display:flex; flex-direction:column; gap:4px; }
+  .mi-field label{ font-size:11px; color:var(--muted); font-weight:700; white-space:nowrap; }
+  .mi-field input{ font-size:13px; padding:7px 9px; }
+  .mi-subtotal-wrap{ display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .mi-subtotal-wrap label{ font-size:11px; color:var(--muted); font-weight:700; }
+  .merchant-item-subtotal{
+    font-size:16px; font-weight:800; font-family:'Cairo',sans-serif;
+    color:var(--ink); padding:6px 8px;
+  }
   .merchant-item-thumb{
-    width:40px; height:40px; border-radius:8px; background:var(--cream) center/cover no-repeat;
+    width:42px; height:42px; border-radius:8px; background:var(--cream) center/cover no-repeat;
     border:1px solid var(--line); flex-shrink:0; display:flex; align-items:center; justify-content:center;
-    font-size:15px; color:var(--muted);
+    font-size:16px; color:var(--muted);
   }
   .merchant-item-thumb.has-img{cursor:zoom-in;}
+  @media(max-width:560px){
+    .mi-row2{ grid-template-columns:1fr 1fr; }
+    .mi-subtotal-wrap{ grid-column:1/3; flex-direction:row; justify-content:space-between; align-items:center; border-top:1px dashed var(--line); padding-top:8px; margin-top:4px; }
+  }
 
   .payment-row{
     display:grid; grid-template-columns:1fr 1fr 1.2fr auto; gap:8px; align-items:center;
@@ -1901,25 +1926,40 @@ function addMerchantItemRow(existing){
   const wrap = document.createElement('div');
   wrap.className = 'merchant-item-row';
   wrap.id = rowId;
+  const defaultItemDate = existing ? (existing.itemDate || document.getElementById('merchantDate').value || new Date().toISOString().slice(0,10)) : (document.getElementById('merchantDate').value || new Date().toISOString().slice(0,10));
   wrap.innerHTML = `
-    <div class="merchant-item-thumb mi-thumb" id="thumb_${rowId}">🧳</div>
-    <div class="mi-name">
-      <select class="merchant-item-select" onchange="onMerchantItemSelect('${rowId}')"></select>
-      <div class="mi-color-wrap" style="display:none; margin-top:6px;">
-        <select class="merchant-item-color-select" onchange="recalcMerchantTotals()" style="width:100%;"></select>
+    <div class="mi-row1">
+      <div class="merchant-item-thumb mi-thumb" id="thumb_${rowId}">🧳</div>
+      <div class="mi-name">
+        <select class="merchant-item-select" onchange="onMerchantItemSelect('${rowId}')"></select>
+        <div class="mi-color-wrap" style="display:none; margin-top:6px;">
+          <select class="merchant-item-color-select" onchange="recalcMerchantTotals()" style="width:100%;"></select>
+        </div>
+      </div>
+      <button class="icon-btn mi-del" onclick="removeMerchantItemRow('${rowId}')" style="color:var(--red); font-size:18px;">🗑</button>
+    </div>
+    <div class="mi-row2">
+      <div class="mi-field">
+        <label>📅 تاريخ الصنف</label>
+        <input type="date" class="merchant-item-date" value="${defaultItemDate}">
+      </div>
+      <div class="mi-field">
+        <label>الكمية</label>
+        <input type="number" min="1" class="merchant-item-qty" placeholder="الكمية" value="${existing?existing.qty:1}" oninput="recalcMerchantTotals()">
+      </div>
+      <div class="mi-field">
+        <label>سعر الوحدة</label>
+        <input type="number" min="0" step="0.01" class="merchant-item-price" placeholder="السعر" value="${existing?existing.unitPrice:''}" readonly tabindex="-1">
+      </div>
+      <div class="mi-field">
+        <label>خصم</label>
+        <input type="number" min="0" step="0.01" class="merchant-item-discount" placeholder="0" value="${existing&&existing.discount?existing.discount:''}" oninput="recalcMerchantTotals()">
+      </div>
+      <div class="mi-subtotal-wrap">
+        <label>الإجمالي</label>
+        <span class="merchant-item-subtotal mi-subtotal">0</span>
       </div>
     </div>
-    <div class="mi-qty">
-      <input type="number" min="1" class="merchant-item-qty" placeholder="الكمية" value="${existing?existing.qty:1}" oninput="recalcMerchantTotals()">
-    </div>
-    <div class="mi-price">
-      <input type="number" min="0" step="0.01" class="merchant-item-price" placeholder="سعر الوحدة" value="${existing?existing.unitPrice:''}" readonly tabindex="-1">
-    </div>
-    <div class="mi-discount">
-      <input type="number" min="0" step="0.01" class="merchant-item-discount" placeholder="خصم" value="${existing&&existing.discount?existing.discount:''}" oninput="recalcMerchantTotals()">
-    </div>
-    <div class="sub merchant-item-subtotal mi-subtotal">0</div>
-    <button class="icon-btn mi-del" onclick="removeMerchantItemRow('${rowId}')">🗑</button>
   `;
   const list = document.getElementById('merchantItemsList');
   if(existing){
@@ -2087,12 +2127,13 @@ function saveMerchantTx(){
       return;
     }
     const chosenColor = hasColorChoice ? colorSel.value : (itemObj?itemObj.color:'');
+    const itemDate = row.querySelector('.merchant-item-date') ? row.querySelector('.merchant-item-date').value : date;
     const netPrice = Math.max(0, unitPrice-discount);
     const subtotal = qty*netPrice;
     total += subtotal;
     txItems.push({
       itemId, itemName: itemObj?itemObj.name:'', color: chosenColor,
-      qty, unitPrice, discount, subtotal
+      qty, unitPrice, discount, subtotal, itemDate: itemDate||date
     });
   }
   if(txItems.length===0){ showToast('أضف صنفاً واحداً على الأقل بكمية صحيحة'); return; }
@@ -2365,12 +2406,12 @@ function openStatementModal(merchantName){
 
   const itemsAgg = {};
   txs.forEach(t=> (t.items||[]).forEach(it=>{
-    const key = (it.itemName||'') + '||' + (it.color||'');
-    if(!itemsAgg[key]) itemsAgg[key] = {itemName: it.itemName||'', color: it.color||'', qty:0, subtotal:0};
+    const key = (it.itemName||'') + '||' + (it.color||'') + '||' + (it.itemDate||t.date||'');
+    if(!itemsAgg[key]) itemsAgg[key] = {itemName: it.itemName||'', color: it.color||'', qty:0, subtotal:0, itemDate: it.itemDate||t.date||''};
     itemsAgg[key].qty += Number(it.qty)||0;
     itemsAgg[key].subtotal += Number(it.subtotal)||0;
   }));
-  const itemsAggList = Object.values(itemsAgg).sort((a,b)=> b.qty - a.qty);
+  const itemsAggList = Object.values(itemsAgg).sort((a,b)=> (a.itemDate||'').localeCompare(b.itemDate||''));
 
   document.getElementById('statementTitle').textContent = 'كشف حساب: ' + merchantName;
   document.getElementById('statementBody').innerHTML = `
@@ -2388,9 +2429,9 @@ function openStatementModal(merchantName){
 
       <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">الأصناف المشتراة</h2></div>
       <table>
-        <thead><tr><th>الصنف</th><th>اللون</th><th>عدد الوحدات</th><th>الإجمالي</th></tr></thead>
+        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th>عدد الوحدات</th><th>الإجمالي</th></tr></thead>
         <tbody>
-          ${itemsAggList.length ? itemsAggList.map(a=>`<tr><td>${escapeHtml(a.itemName)}</td><td>${escapeHtml(a.color||'-')}</td><td class="money">${fmt(a.qty)}</td><td class="money">${fmt(a.subtotal)}</td></tr>`).join('') : '<tr><td colspan="4"><div class="empty">لا توجد أصناف.</div></td></tr>'}
+          ${itemsAggList.length ? itemsAggList.map(a=>`<tr><td>${a.itemDate ? fmtDate(a.itemDate) : '-'}</td><td>${escapeHtml(a.itemName)}</td><td>${escapeHtml(a.color||'-')}</td><td class="money">${fmt(a.qty)}</td><td class="money">${fmt(a.subtotal)}</td></tr>`).join('') : '<tr><td colspan="5"><div class="empty">لا توجد أصناف.</div></td></tr>'}
         </tbody>
       </table>
 
@@ -2429,8 +2470,8 @@ function exportCurrentStatementCsv(){
   s.txs.forEach(t=> rows.push([fmtDate(t.date), (t.items||[]).length, t.total, t.paid, t.remaining]));
   rows.push([]);
   rows.push(['الأصناف المشتراة']);
-  rows.push(['الصنف','اللون','عدد الوحدات','الإجمالي']);
-  s.itemsAggList.forEach(a=> rows.push([a.itemName, a.color||'', a.qty, a.subtotal]));
+  rows.push(['التاريخ','الصنف','اللون','عدد الوحدات','الإجمالي']);
+  s.itemsAggList.forEach(a=> rows.push([a.itemDate ? fmtDate(a.itemDate) : '-', a.itemName, a.color||'', a.qty, a.subtotal]));
   rows.push([]);
   rows.push(['الدفعات']);
   rows.push(['التاريخ','المبلغ','ملاحظة']);
@@ -2467,7 +2508,7 @@ function sendStatementWhatsapp(){
   msg += `\n*الأصناف المشتراة*\n`;
   if(s.itemsAggList.length){
     s.itemsAggList.forEach(a=>{
-      msg += `${a.itemName}${a.color? ' - '+a.color : ''} — عدد: ${fmt(a.qty)} — الإجمالي: ${fmt(a.subtotal)}\n`;
+      msg += `${a.itemDate ? fmtDate(a.itemDate)+' — ' : ''}${a.itemName}${a.color? ' - '+a.color : ''} — عدد: ${fmt(a.qty)} — الإجمالي: ${fmt(a.subtotal)}\n`;
     });
   } else {
     msg += `لا توجد أصناف.\n`;
