@@ -711,7 +711,7 @@
     <div class="section-head" style="margin-top:0;">
       <div>
         <div class="page-title">المبيعات اليومية</div>
-        <div class="page-sub">كل الأصناف اللي اتصرفت للتجار في الفترة المحددة، مجمّعة وقابلة للطباعة</div>
+        <div class="page-sub">كل الأصناف اللي اتصرفت للتجار في اليوم المحدد، قابلة للطباعة</div>
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-outline btn-sm" onclick="exportDailySalesCsv()">⬇️ تصدير CSV</button>
@@ -721,39 +721,21 @@
 
     <div class="filters-row">
       <div class="field">
-        <label>من تاريخ</label>
-        <input id="dsFilterFrom" type="date" onchange="renderDailySales()">
-      </div>
-      <div class="field">
-        <label>إلى تاريخ</label>
-        <input id="dsFilterTo" type="date" onchange="renderDailySales()">
+        <label>اليوم</label>
+        <input id="dsFilterDate" type="date" onchange="renderDailySales()">
       </div>
       <div class="field" style="align-self:flex-end;">
-        <button class="btn btn-outline btn-sm" onclick="setDailySalesToday()">اليوم فقط</button>
+        <button class="btn btn-outline btn-sm" onclick="setDailySalesToday()">اليوم الحالي</button>
       </div>
     </div>
 
     <div id="dailySalesPrintArea">
       <h2 id="dailySalesTitle" style="margin-bottom:4px;">مبيعات اليوم</h2>
-      <div class="stats-grid" style="margin-top:14px;">
-        <div class="stat-card good">
-          <div class="label">إجمالي المبيعات</div>
-          <div class="value" id="dsTotalValue">٠</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">عدد القطع المباعة</div>
-          <div class="value" id="dsTotalQty">٠</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">عدد العمليات</div>
-          <div class="value" id="dsTotalTx">٠</div>
-        </div>
-      </div>
 
       <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">تفاصيل الأصناف المباعة</h2></div>
       <div class="card" style="overflow-x:auto;">
         <table id="dailySalesTable">
-          <thead><tr><th>الصورة</th><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>اللون</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -1143,7 +1125,7 @@ function switchView(name){
   if(name==='remaining') renderRemainingStock();
   if(name==='movements') renderMovements();
   if(name==='dailysales'){
-    if(!document.getElementById('dsFilterFrom').value && !document.getElementById('dsFilterTo').value) setDailySalesToday();
+    if(!document.getElementById('dsFilterDate').value) setDailySalesToday();
     else renderDailySales();
   }
   if(name==='archived') renderArchived();
@@ -2683,68 +2665,56 @@ let currentDailySalesExport = null;
 
 function setDailySalesToday(){
   const today = new Date().toISOString().slice(0,10);
-  document.getElementById('dsFilterFrom').value = today;
-  document.getElementById('dsFilterTo').value = today;
+  document.getElementById('dsFilterDate').value = today;
   renderDailySales();
 }
 
-/* بيجمع كل الأصناف المباعة (من التجار النشطين والمؤرشفين) اللي تاريخ صرفها الفعلي (itemDate) واقع في الفترة المحددة */
-function getDailySalesRows(from, to){
+/* بيجمع كل الأصناف المباعة (من التجار النشطين والمؤرشفين) اللي تاريخ صرفها الفعلي (itemDate) هو نفس اليوم المحدد */
+function getDailySalesRows(day){
   const rows = [];
   const allTxs = [...merchantTxs, ...archivedMerchantTxs];
   allTxs.forEach(t=>{
     (t.items||[]).forEach(it=>{
       const d = it.itemDate || t.date || '';
-      if(from && d < from) return;
-      if(to && d > to) return;
+      if(day && d!==day) return;
       rows.push({
         date: d, merchantName: t.merchantName||'', itemId: it.itemId||'', itemName: it.itemName||'',
-        color: it.color||'', qty: Number(it.qty)||0, subtotal: Number(it.subtotal)||0
+        color: it.color||'', qty: Number(it.qty)||0
       });
     });
   });
-  rows.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  rows.sort((a,b)=> (a.merchantName||'').localeCompare(b.merchantName||''));
   return rows;
 }
 
 function renderDailySales(){
-  const from = document.getElementById('dsFilterFrom').value || '';
-  const to = document.getElementById('dsFilterTo').value || '';
-  const rows = getDailySalesRows(from, to);
-
-  const totalValue = rows.reduce((s,r)=> s + r.subtotal, 0);
-  const totalQty = rows.reduce((s,r)=> s + r.qty, 0);
-  const txCount = new Set(rows.map(r=> r.date+'||'+r.merchantName)).size;
-
-  document.getElementById('dsTotalValue').textContent = fmt(totalValue);
-  document.getElementById('dsTotalQty').textContent = fmt(totalQty);
-  document.getElementById('dsTotalTx').textContent = fmt(txCount);
+  const day = document.getElementById('dsFilterDate').value || '';
+  const rows = getDailySalesRows(day);
 
   const titleEl = document.getElementById('dailySalesTitle');
-  titleEl.textContent = from && to
-    ? (from===to ? 'مبيعات يوم ' + fmtDate(from) : 'المبيعات من ' + fmtDate(from) + ' إلى ' + fmtDate(to))
-    : 'كل المبيعات';
+  titleEl.textContent = day ? 'مبيعات يوم ' + fmtDate(day) : 'كل المبيعات';
 
   const tbody = document.querySelector('#dailySalesTable tbody');
   tbody.innerHTML = rows.length ? rows.map(r=>{
     const item = items.find(i=> i.id===r.itemId);
     const img = item && item.image;
+    const sku = item && item.sku ? item.sku : '-';
     const thumbCell = img
       ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
       : `<div class="ds-thumb">📦</div>`;
     return `
     <tr>
-      <td>${thumbCell}</td>
       <td>${r.date ? fmtDate(r.date) : '-'}</td>
       <td>${escapeHtml(r.merchantName)}</td>
       <td>${escapeHtml(r.itemName)}</td>
+      <td>${escapeHtml(sku)}</td>
       <td>${escapeHtml(r.color||'-')}</td>
       <td class="money">${fmt(r.qty)}</td>
-      <td class="money">${fmt(r.subtotal)}</td>
+      <td>${thumbCell}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="7"><div class="empty">لا توجد مبيعات في الفترة المحددة.</div></td></tr>`;
+  }).join('') : `<tr><td colspan="7"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
 
-  currentDailySalesExport = {from, to, rows, totalValue, totalQty, txCount};
+  currentDailySalesExport = {day, rows};
 }
 
 function printDailySales(){
@@ -2757,13 +2727,13 @@ function exportDailySalesCsv(){
   if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
   const s = currentDailySalesExport;
   const rows = [['المبيعات اليومية']];
-  rows.push([s.from ? 'من ' + fmtDate(s.from) : '', s.to ? 'إلى ' + fmtDate(s.to) : '']);
+  rows.push([s.day ? fmtDate(s.day) : '']);
   rows.push([]);
-  rows.push(['التاريخ','التاجر','الصنف','اللون','الكمية','الإجمالي']);
-  s.rows.forEach(r=> rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName, r.itemName, r.color||'', r.qty, r.subtotal]));
-  rows.push([]);
-  rows.push(['إجمالي عدد القطع', s.totalQty]);
-  rows.push(['إجمالي المبيعات', s.totalValue]);
+  rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية']);
+  s.rows.forEach(r=>{
+    const item = items.find(i=> i.id===r.itemId);
+    rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName, r.itemName, (item&&item.sku)||'-', r.color||'', r.qty]);
+  });
   downloadCsv('المبيعات اليومية.csv', rows);
 }
 
