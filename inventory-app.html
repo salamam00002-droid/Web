@@ -540,10 +540,10 @@
 
 <nav id="mainNav" style="display:none;">
   <button data-view="dashboard" class="active">لوحة التحكم</button>
+  <button data-view="dailysales">المبيعات اليومية</button>
   <button data-view="items">الأصناف</button>
   <button data-view="remaining">المخزون المتبقي</button>
   <button data-view="movements">سجل الحركة</button>
-  <button data-view="dailysales">المبيعات اليومية</button>
   <button data-view="merchants">التجار</button>
   <button data-view="archived">المعاملات المنتهية</button>
 </nav>
@@ -723,9 +723,6 @@
       <div class="field">
         <label>اليوم</label>
         <input id="dsFilterDate" type="date" onchange="renderDailySales()">
-      </div>
-      <div class="field" style="align-self:flex-end;">
-        <button class="btn btn-outline btn-sm" onclick="setDailySalesToday()">اليوم الحالي</button>
       </div>
     </div>
 
