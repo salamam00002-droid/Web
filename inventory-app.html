@@ -365,6 +365,12 @@
   }
   .item-card .thumb img{width:100%; height:100%; object-fit:cover; display:block; transition:.15s;}
   .item-card .thumb:hover img{opacity:.88;}
+  .ds-thumb{
+    width:40px; height:40px; border-radius:8px; overflow:hidden; flex-shrink:0;
+    background:var(--cream); border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
+    font-size:16px; color:var(--muted); cursor:default;
+  }
+  .ds-thumb img{width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in;}
 
   .lightbox-overlay{
     position:fixed; inset:0; background:rgba(15,20,35,.92); display:none;
@@ -507,6 +513,12 @@
     }
     body.printing-statement .modal{max-width:100%; max-height:none; box-shadow:none; border:none; margin:0;}
     body.printing-statement .modal-head, body.printing-statement .modal-foot{display:none;}
+
+    body.printing-dailysales > *:not(main){display:none !important;}
+    body.printing-dailysales{padding:0; background:#fff;}
+    body.printing-dailysales main{max-width:100%; margin:0; padding:0;}
+    body.printing-dailysales .view:not(#view-dailysales){display:none !important;}
+    body.printing-dailysales #view-dailysales > *:not(#dailySalesPrintArea){display:none !important;}
   }
 </style>
 </head>
@@ -531,6 +543,7 @@
   <button data-view="items">الأصناف</button>
   <button data-view="remaining">المخزون المتبقي</button>
   <button data-view="movements">سجل الحركة</button>
+  <button data-view="dailysales">المبيعات اليومية</button>
   <button data-view="merchants">التجار</button>
   <button data-view="archived">المعاملات المنتهية</button>
 </nav>
@@ -690,6 +703,42 @@
         <thead><tr><th>التاريخ</th><th>الصنف</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
         <tbody></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ========== DAILY SALES VIEW ========== -->
+  <div id="view-dailysales" class="view">
+    <div class="section-head" style="margin-top:0;">
+      <div>
+        <div class="page-title">المبيعات اليومية</div>
+        <div class="page-sub">كل الأصناف اللي اتصرفت للتجار في اليوم المحدد، قابلة للطباعة</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="exportDailySalesCsv()">⬇️ تصدير CSV</button>
+        <button class="btn btn-gold btn-sm" onclick="printDailySales()">🖨️ طباعة</button>
+      </div>
+    </div>
+
+    <div class="filters-row">
+      <div class="field">
+        <label>اليوم</label>
+        <input id="dsFilterDate" type="date" onchange="renderDailySales()">
+      </div>
+      <div class="field" style="align-self:flex-end;">
+        <button class="btn btn-outline btn-sm" onclick="setDailySalesToday()">اليوم الحالي</button>
+      </div>
+    </div>
+
+    <div id="dailySalesPrintArea">
+      <h2 id="dailySalesTitle" style="margin-bottom:4px;">مبيعات اليوم</h2>
+
+      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">تفاصيل الأصناف المباعة</h2></div>
+      <div class="card" style="overflow-x:auto;">
+        <table id="dailySalesTable">
+          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -1075,6 +1124,10 @@ function switchView(name){
   if(name==='dashboard') renderDashboard();
   if(name==='remaining') renderRemainingStock();
   if(name==='movements') renderMovements();
+  if(name==='dailysales'){
+    if(!document.getElementById('dsFilterDate').value) setDailySalesToday();
+    else renderDailySales();
+  }
   if(name==='archived') renderArchived();
 }
 
@@ -2278,7 +2331,7 @@ function saveMerchantTx(){
 
   function logIssuedMovements(sourceId){
     txItems.forEach(it=> logStockMovement({
-      itemId: it.itemId, itemName: it.itemName, type:'out', qty: it.qty, date,
+      itemId: it.itemId, itemName: it.itemName, type:'out', qty: it.qty, date: it.itemDate||date,
       note: 'صرف للتاجر: '+merchantName, sourceType:'merchant', sourceId
     }));
   }
@@ -2605,6 +2658,83 @@ function exportCurrentStatementCsv(){
   rows.push(['إجمالي المدفوع', s.paidAll]);
   rows.push(['المتبقي الإجمالي', s.remainingAll]);
   downloadCsv('كشف حساب - ' + s.merchantName + '.csv', rows);
+}
+
+/* ===================== DAILY SALES ===================== */
+let currentDailySalesExport = null;
+
+function setDailySalesToday(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('dsFilterDate').value = today;
+  renderDailySales();
+}
+
+/* بيجمع كل الأصناف المباعة (من التجار النشطين والمؤرشفين) اللي تاريخ صرفها الفعلي (itemDate) هو نفس اليوم المحدد */
+function getDailySalesRows(day){
+  const rows = [];
+  const allTxs = [...merchantTxs, ...archivedMerchantTxs];
+  allTxs.forEach(t=>{
+    (t.items||[]).forEach(it=>{
+      const d = it.itemDate || t.date || '';
+      if(day && d!==day) return;
+      rows.push({
+        date: d, merchantName: t.merchantName||'', itemId: it.itemId||'', itemName: it.itemName||'',
+        color: it.color||'', qty: Number(it.qty)||0
+      });
+    });
+  });
+  rows.sort((a,b)=> (a.merchantName||'').localeCompare(b.merchantName||''));
+  return rows;
+}
+
+function renderDailySales(){
+  const day = document.getElementById('dsFilterDate').value || '';
+  const rows = getDailySalesRows(day);
+
+  const titleEl = document.getElementById('dailySalesTitle');
+  titleEl.textContent = day ? 'مبيعات يوم ' + fmtDate(day) : 'كل المبيعات';
+
+  const tbody = document.querySelector('#dailySalesTable tbody');
+  tbody.innerHTML = rows.length ? rows.map(r=>{
+    const item = items.find(i=> i.id===r.itemId);
+    const img = item && item.image;
+    const sku = item && item.sku ? item.sku : '-';
+    const thumbCell = img
+      ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
+      : `<div class="ds-thumb">📦</div>`;
+    return `
+    <tr>
+      <td>${r.date ? fmtDate(r.date) : '-'}</td>
+      <td>${escapeHtml(r.merchantName)}</td>
+      <td>${escapeHtml(r.itemName)}</td>
+      <td>${escapeHtml(sku)}</td>
+      <td>${escapeHtml(r.color||'-')}</td>
+      <td class="money">${fmt(r.qty)}</td>
+      <td>${thumbCell}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
+
+  currentDailySalesExport = {day, rows};
+}
+
+function printDailySales(){
+  document.body.classList.add('printing-dailysales');
+  window.print();
+  setTimeout(()=> document.body.classList.remove('printing-dailysales'), 300);
+}
+
+function exportDailySalesCsv(){
+  if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
+  const s = currentDailySalesExport;
+  const rows = [['المبيعات اليومية']];
+  rows.push([s.day ? fmtDate(s.day) : '']);
+  rows.push([]);
+  rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية']);
+  s.rows.forEach(r=>{
+    const item = items.find(i=> i.id===r.itemId);
+    rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName, r.itemName, (item&&item.sku)||'-', r.color||'', r.qty]);
+  });
+  downloadCsv('المبيعات اليومية.csv', rows);
 }
 
 /* يحوّل رقم تليفون مصري محلي (01xxxxxxxxx) لصيغة دولية لواتساب (20xxxxxxxxx) */
