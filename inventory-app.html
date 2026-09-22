@@ -13,25 +13,27 @@
 <style>
   :root{
     color-scheme:light;
-    --ink:#1B2A4A;
-    --ink-2:#2E3F63;
+    --ink:#000000;
+    --ink-2:#1a1a1a;
     --gold:#C89B3C;
     --gold-dark:#A87F2C;
     --cream:#F7F4EE;
     --paper:#FFFFFF;
     --line:#E4DFD3;
-    --muted:#7A7568;
+    --muted:#5a5a5a;
     --red:#B4432F;
     --green:#3E7A52;
     --radius:14px;
-    --shadow:0 4px 18px rgba(27,42,74,0.08);
+    --shadow:0 4px 18px rgba(0,0,0,0.10);
     --solid:#1B2A4A;
     --solid-hover:#2E3F63;
+    --header-bg:#1B2A4A;
+    --nav-bg:#2E3F63;
   }
   html.dark-mode{
     color-scheme:dark;
-    --ink:#EDEFF5;
-    --ink-2:#C7CEDE;
+    --ink:#FFFFFF;
+    --ink-2:#E8E8E8;
     --gold:#D8AE55;
     --gold-dark:#EFC878;
     --cream:#20263A;
@@ -41,10 +43,12 @@
     --red:#E17E6B;
     --green:#6BC48C;
     --shadow:0 4px 18px rgba(0,0,0,0.35);
+    --header-bg:#12172A;
+    --nav-bg:#1B2138;
   }
   html.dark-mode body{background:#161B2C;}
-  html.dark-mode header{background:#12172A;}
-  html.dark-mode nav{background:#1B2138;}
+  html.dark-mode header{background:var(--header-bg);}
+  html.dark-mode nav{background:var(--nav-bg);}
   html.dark-mode input, html.dark-mode select, html.dark-mode textarea{
     background:#1E2440;
   }
@@ -60,7 +64,7 @@
 
   /* ---------- Top bar ---------- */
   header{
-    background:var(--ink);
+    background:var(--header-bg);
     color:#fff;
     padding:18px 24px;
     display:flex;
@@ -108,7 +112,7 @@
   nav{
     display:flex;
     gap:4px;
-    background:var(--ink-2);
+    background:var(--nav-bg);
     padding:0 16px;
     overflow-x:auto;
     position:sticky; top:64px; z-index:49;
