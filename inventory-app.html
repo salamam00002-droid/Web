@@ -781,7 +781,16 @@
           <label>سعر الطقم</label>
           <input id="itemPrice" type="number" min="0" step="0.01">
         </div>
-        <div class="field">
+        <div class="field" id="itemStockDisplayField" style="display:none;">
+          <label>المتبقي الحالي بالمخزن (محسوب تلقائياً)</label>
+          <input id="itemStockDisplay" type="number" readonly tabindex="-1" style="background:var(--cream); color:var(--muted); cursor:not-allowed;">
+        </div>
+        <div class="field" id="itemStockAdjField" style="display:none;">
+          <label>تعديل الرصيد الفعلي — أدخل العدد الجديد المتبقي فعلياً بالمخزن</label>
+          <input id="itemStockAdj" type="number" min="0" placeholder="اتركه فارغاً إن لم تتغير الكمية">
+          <p class="helper" style="margin-top:5px;">أدخل هنا فقط لو جردت المخزن أو اكتشفت فرقاً. سيُسجَّل الفرق كحركة مخزون تلقائياً.</p>
+        </div>
+        <div class="field" id="itemStockNewField">
           <label>الكمية الفعلية المتبقية بالمخزن الآن (عدد الأطقم)</label>
           <input id="itemStock" type="number" min="0" value="0">
         </div>
@@ -939,6 +948,18 @@
 
 <script>
 /* ===================== DARK MODE ===================== */
+/* تحويل الأرقام العربية لإنجليزية في كل حقول الإدخال */
+document.addEventListener('input', function(e){
+  const el = e.target;
+  if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'){
+    const arabic = /[٠١٢٣٤٥٦٧٨٩]/;
+    if(arabic.test(el.value)){
+      const pos = el.selectionStart;
+      el.value = el.value.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => d.charCodeAt(0) - 1632);
+      try{ el.setSelectionRange(pos, pos); }catch(err){}
+    }
+  }
+}, true);
 function applyDarkMode(isDark){
   document.documentElement.classList.toggle('dark-mode', isDark);
   const btn = document.getElementById('darkModeToggle');
@@ -1132,9 +1153,12 @@ function updateNotifications(){
 }
 
 /* ===================== HELPERS ===================== */
+function arabicToEnglishNums(s){
+  return String(s).replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => d.charCodeAt(0) - 1632);
+}
 function fmt(n){
-  n = Number(n)||0;
-  return n.toLocaleString('ar-EG', {maximumFractionDigits:2});
+  n = Number(arabicToEnglishNums(String(n||0)))||0;
+  return n.toLocaleString('en-US', {maximumFractionDigits:2});
 }
 function fmtDate(d){
   if(!d) return '';
@@ -1210,7 +1234,22 @@ function openItemModal(item){
   renderItemColorsChips();
   document.getElementById('itemPieces').value = item ? item.piecesCount : 3;
   document.getElementById('itemPrice').value = item ? item.price : '';
-  document.getElementById('itemStock').value = item ? remainingQtyFor(item) : 0;
+  if(item){
+    /* وضع التعديل: نعرض المتبقي الحالي للقراءة + حقل التعديل الاختياري */
+    const currentRemaining = remainingQtyFor(item);
+    document.getElementById('itemStockDisplay').value = currentRemaining;
+    document.getElementById('itemStockAdj').value = '';
+    document.getElementById('itemStockDisplayField').style.display = '';
+    document.getElementById('itemStockAdjField').style.display = '';
+    document.getElementById('itemStockNewField').style.display = 'none';
+    document.getElementById('itemStock').value = currentRemaining;
+  } else {
+    /* وضع الإضافة: نعرض حقل الكمية الابتدائية فقط */
+    document.getElementById('itemStockDisplayField').style.display = 'none';
+    document.getElementById('itemStockAdjField').style.display = 'none';
+    document.getElementById('itemStockNewField').style.display = '';
+    document.getElementById('itemStock').value = 0;
+  }
   syncItemStockFromColors();
   document.getElementById('itemImageFile').value = '';
   setItemImagePreview(item && item.image ? item.image : '');
@@ -1258,18 +1297,28 @@ function updateItemColorQty(idx, val){
 }
 /* الكمية الإجمالية بالمخزن تُحسب تلقائياً من مجموع كميات الألوان مادام المستخدم بدأ يُدخل كميات لكل لون */
 function syncItemStockFromColors(){
-  const stockInput = document.getElementById('itemStock');
-  if(!stockInput) return;
-  if(itemColorsList.length>0 && itemColorsManaged){
-    const total = itemColorsList.reduce((s,c)=> s + (Number(c.qty)||0), 0);
-    stockInput.value = total;
-    stockInput.readOnly = true;
-    stockInput.style.background = 'var(--cream)';
-    stockInput.title = 'محسوبة تلقائياً من مجموع كميات الألوان';
-  }else{
-    stockInput.readOnly = false;
-    stockInput.style.background = '';
-    stockInput.title = '';
+  const isEdit = document.getElementById('itemId').value !== '';
+  if(isEdit){
+    /* في وضع التعديل: نحدّث عرض "المتبقي الحالي" من مجموع الألوان المتبقية */
+    if(itemColorsList.length>0 && itemColorsManaged){
+      const total = itemColorsList.reduce((s,c)=> s + (Number(c.qty)||0), 0);
+      document.getElementById('itemStockDisplay').value = total;
+    }
+  } else {
+    /* في وضع الإضافة: نحدّث حقل الكمية الابتدائية */
+    const stockInput = document.getElementById('itemStock');
+    if(!stockInput) return;
+    if(itemColorsList.length>0 && itemColorsManaged){
+      const total = itemColorsList.reduce((s,c)=> s + (Number(c.qty)||0), 0);
+      stockInput.value = total;
+      stockInput.readOnly = true;
+      stockInput.style.background = 'var(--cream)';
+      stockInput.title = 'محسوبة تلقائياً من مجموع كميات الألوان';
+    }else{
+      stockInput.readOnly = false;
+      stockInput.style.background = '';
+      stockInput.title = '';
+    }
   }
 }
 
@@ -1338,36 +1387,70 @@ function saveItem(){
   const piecesCount = Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
   const usingColorStock = itemColorsList.length>0 && itemColorsManaged;
-  /* الحقول المدخلة هنا (الكمية الإجمالية / كمية كل لون) تمثل العدد الفعلي المتبقي بالمخزن الآن،
-     فنعيد إضافة ما تم صرفه فعلياً للتجار حتى الآن لنحصل على الرصيد الإجمالي الصحيح المخزَّن،
-     بحيث يظهر المتبقي = القيمة التي أدخلها المستخدم بالضبط */
-  const colorStock = {};
-  if(usingColorStock) itemColorsList.forEach(c=> colorStock[c.name] = (Number(c.qty)||0) + issuedQtyForColor(id, c.name));
-  const stockQty = usingColorStock
-    ? Object.values(colorStock).reduce((s,v)=> s + v, 0)
-    : ((Number(document.getElementById('itemStock').value)||0) + issuedQtyFor(id));
-  const image = document.getElementById('itemImageData').value || '';
+  const today = new Date().toISOString().slice(0,10);
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
-  const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold: null, image };
-  if(usingColorStock) payload.colorStock = colorStock;
-  else if(id) payload.colorStock = firebase.firestore.FieldValue.delete();
-  const today = new Date().toISOString().slice(0,10);
-
   if(id){
+    /* ===== وضع التعديل =====
+       stockQty المخزَّن في Firebase = المتبقي + المنصرف (لا نعيد حسابه من المدخل).
+       إذا أدخل المستخدم رقماً في حقل "تعديل الرصيد" نحسب الفرق ونضيف حركة مخزون. */
     const oldItem = items.find(i=>i.id===id);
-    const oldStock = oldItem ? (Number(oldItem.stockQty)||0) : 0;
-    const delta = stockQty - oldStock;
+    const oldStockQty = oldItem ? (Number(oldItem.stockQty)||0) : 0;
+    const issued = issuedQtyFor(id);
+    const currentRemaining = oldStockQty - issued;
+
+    const adjRaw = document.getElementById('itemStockAdj').value;
+    let newStockQty = oldStockQty; // الافتراضي: لا تغيير على الرصيد الأصلي
+    let delta = 0;
+
+    if(adjRaw !== '' && adjRaw !== null){
+      /* المستخدم أدخل رقماً → هذا هو المتبقي الجديد الفعلي */
+      const newRemaining = Math.max(0, Number(adjRaw)||0);
+      /* الرصيد الأصلي الجديد = المتبقي الجديد + المنصرف الحالي (يبقى ثابتاً) */
+      newStockQty = newRemaining + issued;
+      delta = newStockQty - oldStockQty;
+    }
+
+    /* إذا كان الصنف بألوان نحدّث colorStock بنفس المنطق */
+    const colorStock = {};
+    if(usingColorStock){
+      itemColorsList.forEach(c=>{
+        const adjColorRaw = c.qty; // qty هنا = المتبقي الجديد للون
+        const issuedColor = issuedQtyForColor(id, c.name);
+        colorStock[c.name] = adjColorRaw + issuedColor;
+      });
+      if(adjRaw === '' || adjRaw === null){
+        /* إعادة حساب newStockQty من الألوان فقط إذا لم يُدخل تعديلاً يدوياً */
+        newStockQty = Object.values(colorStock).reduce((s,v)=> s+v, 0);
+        delta = newStockQty - oldStockQty;
+      }
+    }
+
+    const payload = { name, category, sku, color, colors, piecesCount, price, stockQty: newStockQty, alertThreshold: null, image: document.getElementById('itemImageData').value || '' };
+    if(usingColorStock) payload.colorStock = colorStock;
+    else if(id) payload.colorStock = firebase.firestore.FieldValue.delete();
+
     db.collection('items').doc(id).update(payload)
       .then(()=>{
         if(delta !== 0){
-          logStockMovement({itemId:id, itemName:name, type: delta>0?'in':'out', qty: Math.abs(delta), date: today, note:'تعديل يدوي للكمية', sourceType:'manual', sourceId:id});
+          logStockMovement({itemId:id, itemName:name, type: delta>0?'in':'out', qty: Math.abs(delta), date: today, note:'تعديل يدوي للرصيد الفعلي', sourceType:'manual', sourceId:id});
         }
         showToast('تم تعديل الصنف'); closeModal('itemModalOverlay');
       })
       .catch(e=> showToast('خطأ: '+e.message));
-  }else{
+
+  } else {
+    /* ===== وضع الإضافة =====
+       stockQty = الكمية الابتدائية كما أدخلها المستخدم مباشرة (لا يوجد issued بعد) */
+    const colorStock = {};
+    if(usingColorStock) itemColorsList.forEach(c=> colorStock[c.name] = (Number(c.qty)||0));
+    const stockQty = usingColorStock
+      ? Object.values(colorStock).reduce((s,v)=> s+v, 0)
+      : (Number(document.getElementById('itemStock').value)||0);
+    const image = document.getElementById('itemImageData').value || '';
+    const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold: null, image };
+    if(usingColorStock) payload.colorStock = colorStock;
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('items').add(payload)
       .then((ref)=>{
@@ -2562,31 +2645,19 @@ function renderDashboard(){
       if(hasColorStock(i)){
         const allColors = Object.keys(i.colorStock);
         const availableColors = allColors.filter(c => remainingQtyForColor(i, c) > 0);
-        const zeroColors = allColors.filter(c => remainingQtyForColor(i, c) <= 0);
-        const makeChip = (c, isZero) => {
+        const makeChip = (c) => {
           const remC = remainingQtyForColor(i, c);
-          return `<span class="color-remain-chip" style="${isZero?'opacity:0.55;':''}">
-            <span class="dot" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}: <b style="${isZero?'color:var(--red);':''}">${fmt(remC)}</b>
+          return `<span class="color-remain-chip">
+            <span class="dot" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}: <b>${fmt(remC)}</b>
           </span>`;
         };
-        let html = '';
         if(availableColors.length){
-          html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);">
-            <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:5px;">✅ متبقي</div>
+          colorRows = `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);">
             <div class="color-remain-chips" style="margin-top:0; padding-top:0; border-top:none;">
-              ${availableColors.map(c=>makeChip(c,false)).join('')}
+              ${availableColors.map(c=>makeChip(c)).join('')}
             </div>
           </div>`;
         }
-        if(zeroColors.length){
-          html += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);">
-            <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:5px;">❌ خلصت</div>
-            <div class="color-remain-chips" style="margin-top:0; padding-top:0; border-top:none;">
-              ${zeroColors.map(c=>makeChip(c,true)).join('')}
-            </div>
-          </div>`;
-        }
-        colorRows = html;
       }
       return `<div class="totals-box" style="margin-bottom:8px;">
         <div class="line" style="align-items:center;">
