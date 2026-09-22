@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <style>
   :root{
     color-scheme:light;
@@ -984,6 +985,7 @@ let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, n
 let merchantItemRowCount = 0;
 let paymentRowCount = 0;
 let currentStatementExport = null;
+let storage;
 
 /* ===================== FIREBASE INIT ===================== */
 // إعدادات المشروع مثبّتة هنا حتى يتصل التطبيق تلقائياً لأي شخص يفتحه، بدون الحاجة لإدخالها كل مرة.
@@ -1009,6 +1011,7 @@ function initFirebaseWithConfig(config){
     document.getElementById('view-loading').classList.add('active');
     firebase.initializeApp(config);
     db = firebase.firestore();
+    storage = firebase.storage();
     firebase.auth().signInAnonymously().catch(function(e){
       document.getElementById('view-loading').classList.remove('active');
       document.getElementById('view-setup').classList.add('active');
@@ -1337,9 +1340,19 @@ function setItemImagePreview(dataUrl){
     removeBtn.style.display = 'none';
   }
 }
+function isStorageImageUrl(url){
+  return typeof url === 'string' && /^https?:\/\//.test(url) &&
+    (url.indexOf('firebasestorage') !== -1 || url.indexOf('storage.googleapis.com') !== -1);
+}
+function deleteStorageImageSilently(url){
+  if(!storage || !isStorageImageUrl(url)) return;
+  storage.refFromURL(url).delete().catch(function(){ /* الملف ممكن يكون اتمسح خلاص، تجاهل الخطأ */ });
+}
 function removeItemImage(){
+  const oldUrl = document.getElementById('itemImageData').value;
   document.getElementById('itemImageFile').value = '';
   setItemImagePreview('');
+  deleteStorageImageSilently(oldUrl);
 }
 function handleItemImageChange(e){
   const file = e.target.files && e.target.files[0];
@@ -1358,12 +1371,33 @@ function handleItemImageChange(e){
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      setItemImagePreview(dataUrl);
+      canvas.toBlob(function(blob){
+        if(!blob){ showToast('تعذّرت معالجة الصورة'); return; }
+        uploadItemImageBlob(blob);
+      }, 'image/jpeg', 0.75);
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+function uploadItemImageBlob(blob){
+  if(!storage){ showToast('Firebase Storage غير متاح'); return; }
+  const oldUrl = document.getElementById('itemImageData').value;
+  const preview = document.getElementById('itemImagePreview');
+  preview.style.backgroundImage = '';
+  preview.textContent = 'جاري رفع الصورة...';
+  document.getElementById('removeItemImageBtn').style.display = 'none';
+  const path = 'items/' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.jpg';
+  const ref = storage.ref().child(path);
+  ref.put(blob, {contentType:'image/jpeg'}).then(function(snap){
+    return snap.ref.getDownloadURL();
+  }).then(function(url){
+    setItemImagePreview(url);
+    deleteStorageImageSilently(oldUrl);
+  }).catch(function(e){
+    setItemImagePreview('');
+    showToast('فشل رفع الصورة: ' + e.message);
+  });
 }
 function openLightbox(src, caption){
   if(!src) return;
