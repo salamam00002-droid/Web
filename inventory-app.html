@@ -208,6 +208,8 @@
     border:1px solid rgba(0,0,0,.15); margin-left:6px;
   }
   .item-card h3{font-size:15.5px; font-weight:800; margin-bottom:2px;}
+  .item-name-label{font-size:11px; font-weight:700; color:var(--muted); margin-top:10px; margin-bottom:4px;}
+  .item-name-big{font-size:22px !important; font-weight:800; color:var(--ink); margin-bottom:4px; line-height:1.3;}
   .item-card .color-name{font-size:12px; color:var(--muted); margin-bottom:10px;}
   .item-card .row{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding:6px 0; border-top:1px dashed var(--line);}
   .item-card .row span:first-child{color:var(--muted);}
@@ -1685,7 +1687,8 @@ function renderRemainingStock(){
     <div class="item-card">
       ${item.image ? `<div class="thumb" onclick='openLightbox(${JSON.stringify(item.image)}, ${JSON.stringify(item.name)})'><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>` : ''}
       <span class="badge">${item.piecesCount} قطع/طقم</span>
-      <h3>${escapeHtml(item.name)}</h3>
+      <div class="item-name-label">اسم الصنف</div>
+      <h3 class="item-name-big">${escapeHtml(item.name)}</h3>
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
       <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
@@ -2582,7 +2585,13 @@ function renderDashboard(){
         colorRows = html;
       }
       return `<div class="totals-box" style="margin-bottom:8px;">
-        <div class="line"><span>${escapeHtml(i.name)}</span><span style="color:${remaining<=0?'var(--red)':'var(--ink)'};">${fmt(remaining)} متبقي</span></div>
+        <div class="line" style="align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;font-weight:700;color:var(--muted);">اسم الصنف :</span>
+            <span style="font-size:20px;font-weight:800;color:var(--ink);font-family:'Cairo',sans-serif;">${escapeHtml(i.name)}</span>
+          </div>
+          <span style="font-size:16px;font-weight:800;font-family:'Cairo',sans-serif;color:${remaining<=0?'var(--red)':'var(--ink)'};">${fmt(remaining)} متبقي</span>
+        </div>
         ${colorRows}
       </div>`;
     }).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف بعد.</p>`;
