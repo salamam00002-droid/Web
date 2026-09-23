@@ -1523,6 +1523,23 @@ function saveItem(){
     const issued = issuedQtyFor(id);
     const currentRemaining = oldStockQty - issued;
 
+    /* تحذير: لو لون موجود سابقاً (وله مبيعات مسجلة عليه) اتشال أو اتغيّر اسمه،
+       المبيعات القديمة هتفضل حاملة الاسم القديم ومش هتتطابق مع الاسم الجديد
+       (تأثير على المتبقي لكل لون وعلى تقارير المبيعات بهذا اللون) */
+    const oldColorNames = oldItem && Array.isArray(oldItem.colors) ? oldItem.colors : [];
+    const newColorNames = colors;
+    const removedColorsWithHistory = oldColorNames.filter(oc=>
+      !newColorNames.includes(oc) && issuedQtyForColor(id, oc) > 0
+    );
+    if(removedColorsWithHistory.length){
+      const proceed = confirm(
+        'الألوان التالية عليها مبيعات مسجلة سابقاً ولن تعود موجودة في الصنف بعد الحفظ:\n' +
+        removedColorsWithHistory.join('، ') +
+        '\n\nالمبيعات القديمة بهذه الألوان هتفضل في السجل لكن حساب "المتبقي" الخاص بها هيتوقف. متابعة الحفظ؟'
+      );
+      if(!proceed) return;
+    }
+
     const adjRaw = document.getElementById('itemStockAdj').value;
     let newStockQty = oldStockQty; // الافتراضي: لا تغيير على الرصيد الأصلي
     let delta = 0;
@@ -1539,7 +1556,7 @@ function saveItem(){
     const colorStock = {};
     if(usingColorStock){
       itemColorsList.forEach(c=>{
-        const adjColorRaw = c.qty; // qty هنا = المتبقي الجديد للون
+        const adjColorRaw = Math.max(0, Number(c.qty)||0); // qty هنا = المتبقي الجديد للون (لا يقل عن صفر)
         const issuedColor = issuedQtyForColor(id, c.name);
         colorStock[c.name] = adjColorRaw + issuedColor;
       });
