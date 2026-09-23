@@ -435,16 +435,6 @@
     .mi-subtotal-wrap{ grid-column:1/3; flex-direction:row; justify-content:space-between; align-items:center; border-top:1px dashed var(--line); padding-top:8px; margin-top:4px; }
   }
 
-  .payment-row{
-    display:grid; grid-template-columns:1fr 1fr 1.2fr auto; gap:8px; align-items:center;
-    padding:8px 0; border-bottom:1px dashed var(--line);
-  }
-  .payment-row:last-child{border-bottom:none;}
-  .payments-empty{color:var(--muted); font-size:12.5px; padding:8px 0;}
-  @media(max-width:640px){
-    .payment-row{grid-template-columns:1fr 1fr;}
-    .payment-row .payment-note{grid-column:1/3;}
-  }
   .totals-box{
     background:var(--cream); border-radius:10px; padding:14px 16px; margin-top:14px;
   }
@@ -452,8 +442,27 @@
   .totals-box .line span:last-child{font-weight:800; font-size:18px; font-family:'Cairo',sans-serif;}
   .totals-box .line.big{font-size:16px; font-weight:800; border-top:1px solid var(--line); margin-top:6px; padding-top:8px;}
   .totals-box .line.big span:last-child{font-size:20px;}
-  .totals-box .line.remain{color:var(--red); font-weight:800;}
-  .totals-box .line.remain span:last-child{color:var(--red); font-size:20px;}
+
+  /* ---------- merchant profile card ---------- */
+  .merchant-profile-card{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:18px 20px; margin-bottom:14px;
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .merchant-profile-info h3{font-size:16px; font-weight:800; margin-bottom:4px;}
+  .merchant-profile-info .phone{font-size:13px; color:var(--muted);}
+  .merchant-profile-info .address{font-size:12px; color:var(--muted); margin-top:3px;}
+  .merchant-history-table{width:100%; border-collapse:collapse; font-size:13px; margin-top:10px;}
+  .merchant-history-table th{text-align:right; color:var(--muted); font-size:11px; font-weight:700; padding:6px 8px; border-bottom:2px solid var(--line);}
+  .merchant-history-table td{padding:9px 8px; border-bottom:1px solid var(--line);}
+  .merchant-history-table tr:last-child td{border-bottom:none;}
+  .merchant-history-table td.money{font-weight:800; font-family:'Cairo',sans-serif;}
+
+  /* ---------- sale entry form ---------- */
+  .sale-entry-card{
+    background:var(--paper); border:2px solid var(--gold); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:20px; margin-bottom:20px;
+  }
 
   .setup-box{max-width:560px; margin:40px auto;}
   .setup-box .field{margin-bottom:12px;}
@@ -605,7 +614,7 @@
       <div class="stat-card warn"><div class="label">إجمالي المنصرف (مباع)</div><div class="value" id="statTotalIssued">0</div></div>
       <div class="stat-card"><div class="label">إجمالي المتبقي</div><div class="value" id="statTotalRemaining">0</div></div>
       <div class="stat-card good"><div class="label">قيمة المخزون الحالي</div><div class="value" id="statStockValue">0</div></div>
-      <div class="stat-card warn"><div class="label">مبالغ مستحقة على التجار</div><div class="value" id="statReceivables">0</div></div>
+      <div class="stat-card good"><div class="label">إجمالي إيرادات المبيعات</div><div class="value" id="statRevenue">0</div></div>
     </div>
 
     <div class="section-head"><h2>📦 جرد المتبقي بالمخزن (لكل صنف بألوانه)</h2></div>
@@ -711,7 +720,7 @@
     <div class="section-head" style="margin-top:0;">
       <div>
         <div class="page-title">المبيعات اليومية</div>
-        <div class="page-sub">كل الأصناف اللي اتصرفت للتجار في اليوم المحدد، قابلة للطباعة</div>
+        <div class="page-sub">تسجيل مبيعات جديدة وعرض سجل المبيعات</div>
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-outline btn-sm" onclick="exportDailySalesCsv()">⬇️ تصدير CSV</button>
@@ -719,10 +728,62 @@
       </div>
     </div>
 
+    <!-- نموذج إدخال بيع جديد -->
+    <div class="sale-entry-card">
+      <div class="section-head" style="margin:0 0 14px;"><h2 style="font-size:15px;">➕ تسجيل عملية بيع جديدة</h2></div>
+      <div class="form-grid">
+        <div class="field">
+          <label>التاريخ</label>
+          <input id="saleDate" type="date">
+        </div>
+        <div class="field">
+          <label>التاجر</label>
+          <select id="saleMerchantSelect">
+            <option value="">اختر التاجر</option>
+          </select>
+        </div>
+        <div class="field grow2">
+          <label>الصنف</label>
+          <select id="saleItemSelect" onchange="onSaleItemSelect()">
+            <option value="">اختر الصنف</option>
+          </select>
+        </div>
+        <div class="field" id="saleColorField" style="display:none;">
+          <label>اللون</label>
+          <select id="saleColorSelect">
+            <option value="">اختر اللون</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>الكود SKU</label>
+          <input id="saleSku" readonly placeholder="يظهر تلقائياً" style="background:var(--cream); cursor:not-allowed;">
+        </div>
+        <div class="field">
+          <label>الكمية</label>
+          <input id="saleQty" type="number" min="1" value="1" placeholder="الكمية">
+        </div>
+        <div class="field">
+          <label>السعر (تلقائي)</label>
+          <input id="salePrice" readonly placeholder="يظهر تلقائياً" style="background:var(--cream); cursor:not-allowed;">
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:10px; align-items:center;">
+        <button class="btn btn-gold" onclick="saveSaleEntry()">💾 حفظ البيع</button>
+        <button class="btn btn-outline" onclick="resetSaleForm()">مسح</button>
+      </div>
+    </div>
+
+    <!-- سجل المبيعات -->
     <div class="filters-row">
       <div class="field">
         <label>اليوم</label>
         <input id="dsFilterDate" type="date" onchange="renderDailySales()">
+      </div>
+      <div class="field">
+        <label>فلتر بالتاجر</label>
+        <select id="dsFilterMerchant" onchange="renderDailySales()">
+          <option value="">كل التجار</option>
+        </select>
       </div>
     </div>
 
@@ -732,7 +793,7 @@
       <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">تفاصيل الأصناف المباعة</h2></div>
       <div class="card" style="overflow-x:auto;">
         <table id="dailySalesTable">
-          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th></tr></thead>
+          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>السعر</th><th>الصورة</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -744,17 +805,17 @@
     <div class="section-head" style="margin-top:0;">
       <div>
         <div class="page-title">التجار</div>
-        <div class="page-sub">تسجيل ما أخذه كل تاجر من الأصناف، والدفعات والمتبقي</div>
+        <div class="page-sub">بيانات التجار وسجل مشترياتهم</div>
       </div>
-      <button class="btn btn-gold edit-action" onclick="openMerchantModal()">+ عملية جديدة</button>
+      <button class="btn btn-gold edit-action" onclick="openMerchantProfileModal()">+ إضافة تاجر</button>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
       <div class="field" style="margin-bottom:0;">
-        <label>🔍 بحث برقم تليفون التاجر (يظهر كل معاملاته المنتهية وغير المنتهية)</label>
+        <label>🔍 بحث بالاسم أو رقم التليفون</label>
         <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-          <input id="merchantPhoneSearch" placeholder="ادخل رقم التليفون..." oninput="renderMerchants()" style="flex:1;">
-          <button class="btn btn-outline btn-sm" onclick="document.getElementById('merchantPhoneSearch').value=''; renderMerchants();">مسح</button>
+          <input id="merchantSearch" placeholder="ابحث عن تاجر..." oninput="renderMerchants()" style="flex:1;">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('merchantSearch').value=''; renderMerchants();">مسح</button>
         </div>
       </div>
     </div>
@@ -899,63 +960,53 @@
   <div class="lightbox-caption" id="lightboxCaption"></div>
 </div>
 
-<!-- ===== MERCHANT MODAL ===== -->
+<!-- ===== MERCHANT PROFILE MODAL ===== -->
 <div class="overlay" id="merchantModalOverlay">
-  <div class="modal" style="max-width:640px;">
+  <div class="modal" style="max-width:480px;">
     <div class="modal-head">
-      <h3 id="merchantModalTitle">عملية تاجر جديدة</h3>
+      <h3 id="merchantModalTitle">إضافة تاجر جديد</h3>
       <button class="icon-btn" onclick="closeModal('merchantModalOverlay')">✕</button>
     </div>
     <div class="modal-body">
-      <input type="hidden" id="merchantTxId">
+      <input type="hidden" id="merchantProfileId">
       <div class="form-grid">
-        <div class="field">
+        <div class="field" style="grid-column:1/-1;">
           <label>اسم التاجر</label>
-          <input id="merchantName" placeholder="اسم التاجر">
+          <input id="merchantProfileName" placeholder="اسم التاجر الكامل">
         </div>
         <div class="field">
           <label>رقم الهاتف (اختياري)</label>
-          <input id="merchantPhone" placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,11)">
+          <input id="merchantProfilePhone" placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,11)">
         </div>
         <div class="field">
-          <label>التاريخ</label>
-          <input id="merchantDate" type="date">
+          <label>العنوان (اختياري)</label>
+          <input id="merchantProfileAddress" placeholder="مثال: القاهرة، شارع الحرية">
         </div>
-        <div class="field">
-          <label>تاريخ استحقاق السداد (اختياري)</label>
-          <input id="merchantDueDate" type="date">
+        <div class="field" style="grid-column:1/-1;">
+          <label>ملاحظات (اختياري)</label>
+          <textarea id="merchantProfileNotes" rows="2" placeholder="أي ملاحظات إضافية"></textarea>
         </div>
-      </div>
-
-      <div class="section-head" style="margin:18px 0 8px;">
-        <h2 style="font-size:14px;">الأصناف المأخوذة</h2>
-        <button class="btn btn-outline btn-sm" onclick="addMerchantItemRow()">+ إضافة صنف</button>
-      </div>
-      <div id="merchantItemsList"></div>
-
-      <div class="totals-box">
-        <div class="line"><span>إجمالي الحساب</span><span id="mTotal">0</span></div>
-      </div>
-
-      <div class="section-head" style="margin:18px 0 8px;">
-        <h2 style="font-size:14px;">الدفعات</h2>
-        <button class="btn btn-outline btn-sm" onclick="addPaymentRow()">+ إضافة دفعة</button>
-      </div>
-      <div id="paymentsList"></div>
-
-      <div class="totals-box">
-        <div class="line"><span>إجمالي المدفوع</span><span id="mPaid">0</span></div>
-        <div class="line remain"><span>المتبقي عليه</span><span id="mRemaining">0</span></div>
-      </div>
-
-      <div class="field" style="margin-top:14px;">
-        <label>ملاحظات (اختياري)</label>
-        <textarea id="merchantNotes" rows="2" placeholder="أي ملاحظات إضافية"></textarea>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-gold" onclick="saveMerchantTx()">حفظ العملية</button>
+      <button class="btn btn-gold" onclick="saveMerchantProfile()">حفظ</button>
       <button class="btn btn-outline" onclick="closeModal('merchantModalOverlay')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MERCHANT PURCHASES HISTORY MODAL ===== -->
+<div class="overlay" id="merchantHistoryModalOverlay">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-head">
+      <h3 id="merchantHistoryTitle">سجل مشتريات التاجر</h3>
+      <button class="icon-btn" onclick="closeModal('merchantHistoryModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body" id="merchantHistoryBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" onclick="printMerchantHistory()">🖨️ طباعة</button>
+      <button class="btn btn-outline" onclick="sendMerchantHistoryWhatsapp()">📱 واتساب</button>
+      <button class="btn btn-outline" onclick="closeModal('merchantHistoryModalOverlay')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -1025,12 +1076,13 @@ let items = [];      // {id, name, color, colors, colorStock:{colorName:qty}, pi
 let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف، كل عنصر {name, qty}
 let itemColorsManaged = false; // true إذا كان المستخدم بدأ يُدخل كمية لكل لون، فتُحسب الكمية الإجمالية تلقائياً
 let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,discount,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
-// discount: خصم خاص بهذا التاجر على سعر الوحدة لهذا الصنف فقط فى هذه العملية (subtotal = qty * (unitPrice - discount))
+let merchantProfiles = []; // {id, name, phone, address, notes, createdAt}
+let saleEntries = []; // {id, date, merchantId, merchantName, itemId, itemName, sku, color, qty, price, createdAt}
 let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
-let paymentRowCount = 0;
 let currentStatementExport = null;
+let currentMerchantHistoryExport = null;
 let storage;
 
 /* ===================== FIREBASE INIT ===================== */
@@ -1074,6 +1126,8 @@ function initFirebaseWithConfig(config){
       listenToMerchantTxs();
       listenToArchivedMerchantTxs();
       listenToStockMovements();
+      listenToMerchantProfiles();
+      listenToSaleEntries();
     });
   }catch(e){
     document.getElementById('view-loading').classList.remove('active');
@@ -1122,9 +1176,12 @@ function switchView(name){
   if(name==='remaining') renderRemainingStock();
   if(name==='movements') renderMovements();
   if(name==='dailysales'){
+    populateSaleMerchantSelect();
+    populateSaleItemSelect();
     if(!document.getElementById('dsFilterDate').value) setDailySalesToday();
     else renderDailySales();
   }
+  if(name==='merchants') renderMerchants();
   if(name==='archived') renderArchived();
 }
 
@@ -1156,31 +1213,17 @@ function getAlertThreshold(item){
 function getLowStockItems(){
   return items.filter(i=> !i.archived && remainingQtyFor(i) <= getAlertThreshold(i));
 }
-function isOverdue(tx){
-  if(!tx.dueDate || Number(tx.remaining)<=0) return false;
-  const today = new Date().toISOString().slice(0,10);
-  return tx.dueDate < today;
-}
-function isDueToday(tx){
-  if(!tx.dueDate || Number(tx.remaining)<=0) return false;
-  const today = new Date().toISOString().slice(0,10);
-  return tx.dueDate === today;
-}
-function getOverdueTxs(){
-  return merchantTxs.filter(isOverdue);
-}
-function getDueTodayTxs(){
-  return merchantTxs.filter(isDueToday);
-}
+function isOverdue(tx){ return false; } // legacy stub
+function isDueToday(tx){ return false; } // legacy stub
+function getOverdueTxs(){ return []; }
+function getDueTodayTxs(){ return []; }
 function updateNotifications(){
   const badge = document.getElementById('notifBadge');
   const panel = document.getElementById('notifPanel');
   if(!badge || !panel) return;
 
   const low = getLowStockItems();
-  const dueToday = getDueTodayTxs();
-  const overdue = getOverdueTxs();
-  const count = low.length + dueToday.length + overdue.length;
+  const count = low.length;
 
   badge.textContent = count;
   badge.classList.toggle('show', count>0);
@@ -1193,14 +1236,6 @@ function updateNotifications(){
   if(low.length){
     html += `<div class="notif-section-title">📦 أصناف قاربت على النفاد</div>`;
     html += low.map(i=>`<div class="notif-item" onclick="switchView('remaining'); closeNotifPanel();">${escapeHtml(i.name)} — متبقي ${fmt(remainingQtyFor(i))}</div>`).join('');
-  }
-  if(dueToday.length){
-    html += `<div class="notif-section-title">📅 دفعات يحين موعد استحقاقها اليوم</div>`;
-    html += dueToday.map(t=>`<div class="notif-item" onclick="switchView('merchants'); closeNotifPanel();">${escapeHtml(t.merchantName)} — متبقي ${fmt(t.remaining)} (يستحق اليوم ${fmtDate(t.dueDate)})</div>`).join('');
-  }
-  if(overdue.length){
-    html += `<div class="notif-section-title">⚠️ دفعات متأخرة</div>`;
-    html += overdue.map(t=>`<div class="notif-item" onclick="switchView('merchants'); closeNotifPanel();">${escapeHtml(t.merchantName)} — متبقي ${fmt(t.remaining)} (استحق ${fmtDate(t.dueDate)})</div>`).join('');
   }
   panel.innerHTML = html;
 }
@@ -1227,23 +1262,23 @@ function itemCreatedDateStr(item){
 }
 function issuedQtyFor(itemId){
   let sum = 0;
+  // من المبيعات الجديدة
+  saleEntries.forEach(s=>{ if(s.itemId===itemId) sum += Number(s.qty)||0; });
+  // من معاملات التجار القديمة (للتوافق مع البيانات السابقة)
   merchantTxs.forEach(tx=>{
-    (tx.items||[]).forEach(it=>{
-      if(it.itemId === itemId) sum += Number(it.qty)||0;
-    });
+    (tx.items||[]).forEach(it=>{ if(it.itemId===itemId) sum += Number(it.qty)||0; });
   });
   return sum;
 }
 function remainingQtyFor(item){
   return (Number(item.stockQty)||0) - issuedQtyFor(item.id);
 }
-/* المنصرف من لون معين لصنف معين (يعتمد على اللون المسجل في كل عملية تاجر) */
+/* المنصرف من لون معين لصنف معين */
 function issuedQtyForColor(itemId, colorName){
   let sum = 0;
+  saleEntries.forEach(s=>{ if(s.itemId===itemId && (s.color||'')===colorName) sum += Number(s.qty)||0; });
   merchantTxs.forEach(tx=>{
-    (tx.items||[]).forEach(it=>{
-      if(it.itemId === itemId && (it.color||'') === colorName) sum += Number(it.qty)||0;
-    });
+    (tx.items||[]).forEach(it=>{ if(it.itemId===itemId && (it.color||'')===colorName) sum += Number(it.qty)||0; });
   });
   return sum;
 }
@@ -1755,6 +1790,8 @@ function exportFullBackup(){
     app: 'مخزنى',
     items: items.map(serializeDocForExport),
     merchantTxs: merchantTxs.map(serializeDocForExport),
+    merchantProfiles: merchantProfiles.map(serializeDocForExport),
+    saleEntries: saleEntries.map(serializeDocForExport),
     archivedMerchantTxs: archivedMerchantTxs.map(serializeDocForExport),
     stockMovements: stockMovements.map(serializeDocForExport)
   };
@@ -1829,13 +1866,17 @@ function restoreFullBackup(data){
   Promise.all([
     clearCollection('items'),
     clearCollection('merchantTransactions'),
+    clearCollection('merchantProfiles'),
+    clearCollection('saleEntries'),
     clearCollection('archivedMerchantTransactions'),
     clearCollection('stockMovements')
   ]).then(()=> Promise.all([
     writeBackupCollection('items', data.items),
-    writeBackupCollection('merchantTransactions', data.merchantTxs),
-    writeBackupCollection('archivedMerchantTransactions', data.archivedMerchantTxs),
-    writeBackupCollection('stockMovements', data.stockMovements)
+    writeBackupCollection('merchantTransactions', data.merchantTxs||[]),
+    writeBackupCollection('merchantProfiles', data.merchantProfiles||[]),
+    writeBackupCollection('saleEntries', data.saleEntries||[]),
+    writeBackupCollection('archivedMerchantTransactions', data.archivedMerchantTxs||[]),
+    writeBackupCollection('stockMovements', data.stockMovements||[])
   ])).then(()=>{
     showToast('تمت استعادة النسخة الاحتياطية بنجاح');
     closeModal('backupModalOverlay');
@@ -2054,35 +2095,296 @@ function openArchivedStatementModal(tx){
   document.getElementById('statementModalOverlay').classList.add('active');
 }
 
-function openMerchantModal(tx){
-  document.getElementById('merchantModalTitle').textContent = tx ? 'تعديل العملية' : 'عملية تاجر جديدة';
-  document.getElementById('merchantTxId').value = tx ? tx.id : '';
-  document.getElementById('merchantName').value = tx ? tx.merchantName : '';
-  document.getElementById('merchantPhone').value = tx ? (tx.phone||'') : '';
-  document.getElementById('merchantDate').value = tx ? tx.date : new Date().toISOString().slice(0,10);
-  document.getElementById('merchantDueDate').value = tx ? (tx.dueDate||'') : '';
-  document.getElementById('merchantNotes').value = tx ? (tx.notes||'') : '';
+/* ===================== MERCHANT PROFILES ===================== */
 
-  document.getElementById('merchantItemsList').innerHTML = '';
-  merchantItemRowCount = 0;
-  if(tx && tx.items && tx.items.length){
-    tx.items.forEach(it=> addMerchantItemRow(it));
-  }else{
-    addMerchantItemRow();
-  }
+/* توحيد شكل اسم التاجر للمطابقة (تجاهل الفراغات الزائدة واختلاف حالة الأحرف) */
+function normalizeMerchantName(n){
+  return (n||'').trim().replace(/\s+/g,' ').toLowerCase();
+}
 
-  document.getElementById('paymentsList').innerHTML = '';
-  paymentRowCount = 0;
-  if(tx && tx.payments && tx.payments.length){
-    tx.payments.forEach(p=> addPaymentRow(p));
-  }else if(tx && Number(tx.paid)>0){
-    // بيانات قديمة كانت تُسجَّل كدفعة واحدة بدون تاريخ منفصل — نحوّلها لأول دفعة مقدمة
-    addPaymentRow({date: tx.date, amount: tx.paid, note: 'دفعة مقدمة'});
-  }
+/* كل عمليات التاجر مجمّعة من مصدرين: المبيعات الحالية (saleEntries) + السجل القديم (merchantTxs + archivedMerchantTxs) */
+function getMerchantOperationRows(profile){
+  const rows = [];
 
-  recalcMerchantTotals();
+  saleEntries.filter(s=> s.merchantId===profile.id).forEach(r=>{
+    rows.push({
+      date: r.date,
+      itemName: r.itemName,
+      sku: r.sku||'-',
+      color: r.color||'',
+      qty: r.qty,
+      price: r.price,
+      subtotal: (Number(r.qty)||0)*(Number(r.price)||0),
+      sourceLabel: 'عملية حالية'
+    });
+  });
+
+  const nameKey = normalizeMerchantName(profile.name);
+  const legacyTagged = [
+    ...merchantTxs.filter(tx=> normalizeMerchantName(tx.merchantName)===nameKey).map(tx=> ({tx, status:'سجل قديم — مفتوحة'})),
+    ...archivedMerchantTxs.filter(tx=> normalizeMerchantName(tx.merchantName)===nameKey).map(tx=> ({tx, status:'سجل قديم — مؤرشفة'}))
+  ];
+  legacyTagged.forEach(({tx, status})=>{
+    (tx.items||[]).forEach(it=>{
+      rows.push({
+        date: it.itemDate || tx.date,
+        itemName: it.itemName,
+        sku: '-',
+        color: it.color||'',
+        qty: it.qty,
+        price: it.unitPrice,
+        subtotal: it.subtotal!=null ? it.subtotal : (Number(it.qty)||0)*(Number(it.unitPrice)||0),
+        sourceLabel: status
+      });
+    });
+  });
+
+  rows.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  return rows;
+}
+
+function listenToMerchantProfiles(){
+  db.collection('merchantProfiles').orderBy('createdAt','desc').onSnapshot(snap=>{
+    merchantProfiles = [];
+    snap.forEach(doc=> merchantProfiles.push({id: doc.id, ...doc.data()}));
+    renderMerchants();
+    populateSaleMerchantSelect();
+    populateDsFilterMerchant();
+  }, err=> showToast('خطأ في قراءة التجار: '+err.message));
+}
+
+function openMerchantProfileModal(profile){
+  document.getElementById('merchantModalTitle').textContent = profile ? 'تعديل بيانات التاجر' : 'إضافة تاجر جديد';
+  document.getElementById('merchantProfileId').value = profile ? profile.id : '';
+  document.getElementById('merchantProfileName').value = profile ? (profile.name||'') : '';
+  document.getElementById('merchantProfilePhone').value = profile ? (profile.phone||'') : '';
+  document.getElementById('merchantProfileAddress').value = profile ? (profile.address||'') : '';
+  document.getElementById('merchantProfileNotes').value = profile ? (profile.notes||'') : '';
   document.getElementById('merchantModalOverlay').classList.add('active');
 }
+
+function saveMerchantProfile(){
+  const id = document.getElementById('merchantProfileId').value;
+  const name = document.getElementById('merchantProfileName').value.trim();
+  const phoneRaw = document.getElementById('merchantProfilePhone').value.trim();
+  const phone = normalizePhoneDigits(phoneRaw);
+  const address = document.getElementById('merchantProfileAddress').value.trim();
+  const notes = document.getElementById('merchantProfileNotes').value.trim();
+  if(!name){ showToast('من فضلك أدخل اسم التاجر'); return; }
+  if(phoneRaw && !isValidEgyptianPhone(phoneRaw)){
+    showToast('رقم التليفون غير صحيح، يجب أن يكون 11 رقم ويبدأ بـ 01');
+    return;
+  }
+  const payload = {name, phone, address, notes};
+  if(id){
+    db.collection('merchantProfiles').doc(id).update(payload)
+      .then(()=>{ showToast('تم تعديل بيانات التاجر'); closeModal('merchantModalOverlay'); })
+      .catch(e=> showToast('خطأ: '+e.message));
+  } else {
+    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    db.collection('merchantProfiles').add(payload)
+      .then(()=>{ showToast('تم إضافة التاجر'); closeModal('merchantModalOverlay'); })
+      .catch(e=> showToast('خطأ: '+e.message));
+  }
+}
+
+function deleteMerchantProfile(id){
+  if(!confirm('هل تريد حذف هذا التاجر؟ لن تُحذف سجلات مبيعاته.')) return;
+  db.collection('merchantProfiles').doc(id).delete()
+    .then(()=> showToast('تم حذف التاجر'))
+    .catch(e=> showToast('خطأ: '+e.message));
+}
+
+function openMerchantHistoryModal(profile){
+  currentMerchantHistoryExport = null;
+  const rows = getMerchantOperationRows(profile);
+  const total = rows.reduce((s,r)=> s + (Number(r.subtotal)||0), 0);
+
+  document.getElementById('merchantHistoryTitle').textContent = 'مشتريات: ' + profile.name;
+  document.getElementById('merchantHistoryBody').innerHTML = `
+    <div id="merchantHistoryPrintArea">
+      <h2 style="margin-bottom:4px;">${escapeHtml(profile.name)}</h2>
+      ${profile.phone? `<p class="page-sub" style="margin-bottom:14px;"><a href="tel:${escapeHtml(profile.phone)}" style="color:inherit; text-decoration:none;">📞 ${escapeHtml(profile.phone)}</a></p>`:'<div style="margin-bottom:14px;"></div>'}
+      ${profile.address? `<p class="page-sub" style="margin-bottom:14px;">📍 ${escapeHtml(profile.address)}</p>`:''}
+
+      <div class="section-head" style="margin:10px 0 8px;"><h2 style="font-size:14px;">سجل العمليات (${rows.length} عملية)</h2></div>
+      <div style="overflow-x:auto;">
+        <table class="merchant-history-table">
+          <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>{
+              return `<tr>
+                <td>${r.date ? fmtDate(r.date) : '-'}</td>
+                <td>${escapeHtml(r.itemName||'-')}</td>
+                <td>${escapeHtml(r.color||'-')}</td>
+                <td class="money">${fmt(r.qty)}</td>
+                <td class="money">${fmt(r.price)}</td>
+                <td class="money">${fmt(r.subtotal)}</td>
+              </tr>`;
+            }).join('') : '<tr><td colspan="6"><div class="empty">لا توجد مشتريات مسجلة لهذا التاجر.</div></td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      ${rows.length ? `<div class="totals-box" style="margin-top:14px;">
+        <div class="line big"><span>إجمالي المشتريات</span><span>${fmt(total)}</span></div>
+      </div>` : ''}
+    </div>
+  `;
+  document.getElementById('merchantHistoryModalOverlay').classList.add('active');
+  currentMerchantHistoryExport = {profile, rows, total};
+}
+
+function printMerchantHistory(){
+  document.body.classList.add('printing-statement');
+  window.print();
+  setTimeout(()=> document.body.classList.remove('printing-statement'), 300);
+}
+
+function sendMerchantHistoryWhatsapp(){
+  if(!currentMerchantHistoryExport){ showToast('لا يوجد سجل مفتوح'); return; }
+  const {profile, rows, total} = currentMerchantHistoryExport;
+  if(!profile.phone){ showToast('لا يوجد رقم تليفون مسجل لهذا التاجر'); return; }
+  const waNumber = normalizePhoneForWhatsapp(profile.phone);
+  let msg = `*سجل مشتريات: ${profile.name}*\n\n`;
+  rows.forEach(r=>{
+    msg += `${r.date?fmtDate(r.date):'-'} — ${r.itemName}${r.color?' ('+r.color+')':''} — كمية: ${fmt(r.qty)} — سعر: ${fmt(r.price)} — إجمالي: ${fmt(r.subtotal)}\n`;
+  });
+  msg += `\n*الإجمالي الكلي: ${fmt(total)}*`;
+  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+/* ===================== SALE ENTRIES ===================== */
+function listenToSaleEntries(){
+  db.collection('saleEntries').orderBy('date','desc').onSnapshot(snap=>{
+    saleEntries = [];
+    snap.forEach(doc=> saleEntries.push({id: doc.id, ...doc.data()}));
+    renderDailySales();
+    renderDashboard();
+    renderItems();
+    renderRemainingStock();
+    updateNotifications();
+    populateDsFilterMerchant();
+  }, err=> showToast('خطأ في قراءة المبيعات: '+err.message));
+}
+
+function populateSaleMerchantSelect(){
+  const sel = document.getElementById('saleMerchantSelect');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">اختر التاجر</option>' + merchantProfiles.map(p=>
+    `<option value="${p.id}">${escapeHtml(p.name)}${p.phone?' ('+p.phone+')':''}</option>`
+  ).join('');
+  if(current) sel.value = current;
+}
+
+function populateSaleItemSelect(){
+  const sel = document.getElementById('saleItemSelect');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">اختر الصنف</option>' + items.filter(i=>!i.archived).map(i=>
+    `<option value="${i.id}" data-price="${i.price}" data-sku="${escapeHtml(i.sku||'')}" data-color="${escapeHtml(i.color||'')}">${escapeHtml(i.name)}</option>`
+  ).join('');
+  if(current) sel.value = current;
+}
+
+function populateDsFilterMerchant(){
+  const sel = document.getElementById('dsFilterMerchant');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">كل التجار</option>' + merchantProfiles.map(p=>
+    `<option value="${p.id}">${escapeHtml(p.name)}</option>`
+  ).join('');
+  if(current) sel.value = current;
+}
+
+function onSaleItemSelect(){
+  const sel = document.getElementById('saleItemSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if(!opt || !opt.value){
+    document.getElementById('salePrice').value = '';
+    document.getElementById('saleSku').value = '';
+    document.getElementById('saleColorField').style.display = 'none';
+    return;
+  }
+  document.getElementById('salePrice').value = opt.getAttribute('data-price')||'';
+  document.getElementById('saleSku').value = opt.getAttribute('data-sku')||'';
+  // ألوان الصنف
+  const itemObj = items.find(i=>i.id===opt.value);
+  const colorSel = document.getElementById('saleColorSelect');
+  const colorField = document.getElementById('saleColorField');
+  if(itemObj && Array.isArray(itemObj.colors) && itemObj.colors.length>1){
+    colorSel.innerHTML = '<option value="">اختر اللون</option>' + itemObj.colors.map(c=>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+    ).join('');
+    colorField.style.display = '';
+  } else {
+    colorSel.innerHTML = '';
+    colorField.style.display = 'none';
+  }
+}
+
+function resetSaleForm(){
+  document.getElementById('saleItemSelect').value = '';
+  document.getElementById('saleMerchantSelect').value = '';
+  document.getElementById('saleQty').value = 1;
+  document.getElementById('salePrice').value = '';
+  document.getElementById('saleSku').value = '';
+  document.getElementById('saleColorField').style.display = 'none';
+}
+
+function saveSaleEntry(){
+  const dateVal = document.getElementById('saleDate').value;
+  const merchantId = document.getElementById('saleMerchantSelect').value;
+  const itemId = document.getElementById('saleItemSelect').value;
+  const qty = Number(document.getElementById('saleQty').value)||0;
+  const price = Number(document.getElementById('salePrice').value)||0;
+  const sku = document.getElementById('saleSku').value;
+  const colorSel = document.getElementById('saleColorSelect');
+  const colorField = document.getElementById('saleColorField');
+  const color = (colorField.style.display !== 'none' && colorSel) ? colorSel.value : '';
+
+  if(!dateVal){ showToast('من فضلك اختر التاريخ'); return; }
+  if(!merchantId){ showToast('من فضلك اختر التاجر'); return; }
+  if(!itemId){ showToast('من فضلك اختر الصنف'); return; }
+  if(qty<=0){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
+  if(colorField.style.display !== 'none' && !color){ showToast('من فضلك اختر اللون'); return; }
+
+  const merchantProfile = merchantProfiles.find(p=>p.id===merchantId);
+  const itemObj = items.find(i=>i.id===itemId);
+
+  const payload = {
+    date: dateVal,
+    merchantId,
+    merchantName: merchantProfile ? merchantProfile.name : '',
+    itemId,
+    itemName: itemObj ? itemObj.name : '',
+    sku,
+    color,
+    qty,
+    price,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  const today = dateVal;
+  db.collection('saleEntries').add(payload).then(ref=>{
+    logStockMovement({
+      itemId, itemName: itemObj?itemObj.name:'', type:'out', qty, date: today,
+      note: 'بيع للتاجر: '+(merchantProfile?merchantProfile.name:''), sourceType:'sale', sourceId: ref.id
+    });
+    showToast('تم حفظ البيع بنجاح');
+    resetSaleForm();
+  }).catch(e=> showToast('خطأ: '+e.message));
+}
+
+function deleteSaleEntry(id, itemId, itemName, qty, date){
+  if(!confirm('هل تريد حذف هذه العملية؟ سيتم استعادة الكمية للمخزون.')) return;
+  db.collection('saleEntries').doc(id).delete().then(()=>{
+    logStockMovement({itemId, itemName, type:'in', qty, date, note:'إلغاء بيع', sourceType:'sale_cancel', sourceId:id});
+    showToast('تم حذف العملية');
+  }).catch(e=> showToast('خطأ: '+e.message));
+}
+
+function openMerchantModal(tx){}  /* legacy - kept to avoid errors from archived views */
 
 function populateMerchantItemSelects(){
   document.querySelectorAll('.merchant-item-select').forEach(sel=>{
@@ -2100,7 +2402,7 @@ function addMerchantItemRow(existing){
   const wrap = document.createElement('div');
   wrap.className = 'merchant-item-row';
   wrap.id = rowId;
-  const defaultItemDate = existing ? (existing.itemDate || document.getElementById('merchantDate').value || new Date().toISOString().slice(0,10)) : (document.getElementById('merchantDate').value || new Date().toISOString().slice(0,10));
+  const defaultItemDate = existing ? (existing.itemDate || new Date().toISOString().slice(0,10)) : new Date().toISOString().slice(0,10);
   wrap.innerHTML = `
     <div class="mi-row1">
       <div class="merchant-item-thumb mi-thumb" id="thumb_${rowId}">🧳</div>
@@ -2209,55 +2511,15 @@ function recalcMerchantTotals(){
   document.querySelectorAll('.merchant-item-row').forEach(row=>{
     const qty = Number(row.querySelector('.merchant-item-qty').value)||0;
     const price = Number(row.querySelector('.merchant-item-price').value)||0;
-    const discount = Number(row.querySelector('.merchant-item-discount').value)||0;
+    const discount = Number(row.querySelector('.merchant-item-discount')?.value)||0;
     const netPrice = Math.max(0, price-discount);
     const subtotal = qty*netPrice;
-    row.querySelector('.merchant-item-subtotal').textContent = fmt(subtotal);
+    const subtotalEl = row.querySelector('.merchant-item-subtotal');
+    if(subtotalEl) subtotalEl.textContent = fmt(subtotal);
     total += subtotal;
   });
-  const paid = getPaymentsTotal();
-  document.getElementById('mTotal').textContent = fmt(total);
-  document.getElementById('mPaid').textContent = fmt(paid);
-  document.getElementById('mRemaining').textContent = fmt(total-paid);
-}
-
-function getPaymentsTotal(){
-  let sum = 0;
-  document.querySelectorAll('.payment-row').forEach(row=>{
-    sum += Number(row.querySelector('.payment-amount').value)||0;
-  });
-  return sum;
-}
-
-function addPaymentRow(existing){
-  paymentRowCount++;
-  const rowId = 'pay_'+paymentRowCount;
-  const wrap = document.createElement('div');
-  wrap.className = 'payment-row';
-  wrap.id = rowId;
-  const dateVal = existing ? (existing.date||'') : new Date().toISOString().slice(0,10);
-  const amountVal = existing ? (existing.amount||0) : '';
-  const noteVal = existing ? (existing.note||'') : '';
-  wrap.innerHTML = `
-    <div>
-      <input type="date" class="payment-date" value="${dateVal}" oninput="recalcMerchantTotals()">
-    </div>
-    <div>
-      <input type="number" min="0" step="0.01" class="payment-amount" placeholder="المبلغ" value="${amountVal}" oninput="recalcMerchantTotals()">
-    </div>
-    <div>
-      <input type="text" class="payment-note" placeholder="ملاحظة (اختياري)" value="${escapeHtml(noteVal)}">
-    </div>
-    <button class="icon-btn" onclick="removePaymentRow('${rowId}')">🗑</button>
-  `;
-  document.getElementById('paymentsList').appendChild(wrap);
-  recalcMerchantTotals();
-}
-
-function removePaymentRow(rowId){
-  const el = document.getElementById(rowId);
-  if(el) el.remove();
-  recalcMerchantTotals();
+  const totalEl = document.getElementById('mTotal');
+  if(totalEl) totalEl.textContent = fmt(total);
 }
 
 function isValidEgyptianPhone(phone){
@@ -2265,105 +2527,17 @@ function isValidEgyptianPhone(phone){
   return /^01[0-9]{9}$/.test(digits);
 }
 
-function saveMerchantTx(){
-  const id = document.getElementById('merchantTxId').value;
-  const merchantName = document.getElementById('merchantName').value.trim();
-  const phoneRaw = document.getElementById('merchantPhone').value.trim();
-  const phone = normalizePhoneDigits(phoneRaw);
-  const date = document.getElementById('merchantDate').value || new Date().toISOString().slice(0,10);
-  const dueDate = document.getElementById('merchantDueDate').value || '';
-  const notes = document.getElementById('merchantNotes').value.trim();
-
-  if(!merchantName){ showToast('من فضلك أدخل اسم التاجر'); return; }
-
-  if(phoneRaw && !isValidEgyptianPhone(phoneRaw)){
-    showToast('رقم التليفون غير صحيح، يجب أن يكون 11 رقم ويبدأ بـ 01');
-    document.getElementById('merchantPhone').focus();
-    return;
-  }
-
-  const rows = [...document.querySelectorAll('.merchant-item-row')];
-  const txItems = [];
-  let total = 0;
-  for(const row of rows){
-    const sel = row.querySelector('.merchant-item-select');
-    const itemId = sel.value;
-    const qty = Number(row.querySelector('.merchant-item-qty').value)||0;
-    const unitPrice = Number(row.querySelector('.merchant-item-price').value)||0;
-    const discount = Number(row.querySelector('.merchant-item-discount').value)||0;
-    if(!itemId || qty<=0) continue;
-    const itemObj = items.find(i=>i.id===itemId);
-    const colorWrap = row.querySelector('.mi-color-wrap');
-    const colorSel = row.querySelector('.merchant-item-color-select');
-    const hasColorChoice = colorWrap && colorWrap.style.display !== 'none';
-    if(hasColorChoice && !colorSel.value){
-      showToast('من فضلك اختر لون الصنف: ' + (itemObj?itemObj.name:''));
-      return;
-    }
-    const chosenColor = hasColorChoice ? colorSel.value : (itemObj?itemObj.color:'');
-    const itemDate = row.querySelector('.merchant-item-date') ? row.querySelector('.merchant-item-date').value : date;
-    const netPrice = Math.max(0, unitPrice-discount);
-    const subtotal = qty*netPrice;
-    total += subtotal;
-    txItems.push({
-      itemId, itemName: itemObj?itemObj.name:'', color: chosenColor,
-      qty, unitPrice, discount, subtotal, itemDate: itemDate||date
-    });
-  }
-  if(txItems.length===0){ showToast('أضف صنفاً واحداً على الأقل بكمية صحيحة'); return; }
-
-  const payments = [];
-  document.querySelectorAll('.payment-row').forEach(row=>{
-    const pDate = row.querySelector('.payment-date').value || date;
-    const pAmount = Number(row.querySelector('.payment-amount').value)||0;
-    const pNote = row.querySelector('.payment-note').value.trim();
-    if(pAmount>0) payments.push({date: pDate, amount: pAmount, note: pNote});
-  });
-  const paid = payments.reduce((s,p)=> s + p.amount, 0);
-
-  const payload = {
-    merchantName, phone, date, dueDate, notes,
-    items: txItems, total, payments, paid, remaining: total-paid
-  };
-
-  function logIssuedMovements(sourceId){
-    txItems.forEach(it=> logStockMovement({
-      itemId: it.itemId, itemName: it.itemName, type:'out', qty: it.qty, date: it.itemDate||date,
-      note: 'صرف للتاجر: '+merchantName, sourceType:'merchant', sourceId
-    }));
-  }
-
-  if(id){
-    deleteMovementsBySource(id).then(()=>{
-      db.collection('merchantTransactions').doc(id).update(payload)
-        .then(()=>{
-          logIssuedMovements(id);
-          showToast('تم تعديل العملية'); closeModal('merchantModalOverlay');
-        })
-        .catch(e=> showToast('خطأ: '+e.message));
-    });
-  }else{
-    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    db.collection('merchantTransactions').add(payload)
-      .then((ref)=>{
-        logIssuedMovements(ref.id);
-        showToast('تم حفظ العملية'); closeModal('merchantModalOverlay');
-      })
-      .catch(e=> showToast('خطأ: '+e.message));
-  }
-}
+function saveMerchantTx(){ showToast('يُرجى استخدام قسم المبيعات اليومية لتسجيل البيع'); }
 
 function deleteMerchantTx(id){
-  if(!confirm('هل تريد إنهاء هذه العملية؟ سيتم نقلها إلى سجل المعاملات المنتهية وخصم كمياتها نهائياً من المخزون.')) return;
+  if(!confirm('هل تريد أرشفة هذه المعاملة (تحويلها لمدفوعة ومنتهية)؟ سيتم خصم كمياتها نهائياً من المخزون.')) return;
   const tx = merchantTxs.find(t=> t.id === id);
   if(!tx){ showToast('تعذر إيجاد العملية'); return; }
 
   const { id: _oldId, ...txData } = tx;
   const batch = db.batch();
 
-  // خصم الكميات نهائياً من رصيد كل صنف، بدل الاعتماد على بقاء المعاملة ضمن "النشطة"
-  // لأن issuedQtyFor() يحسب فقط المعاملات النشطة، فحذف/أرشفة المعاملة كان بيرجّع
-  // "المتبقي" لأعلى وكأن الكمية عادت للمخزن رغم إنها خرجت فعلياً للتاجر.
+  // خصم الكميات نهائياً من رصيد كل صنف
   (tx.items||[]).forEach(it=>{
     if(!it.itemId || !it.qty) return;
     const itemRef = db.collection('items').doc(it.itemId);
@@ -2373,6 +2547,8 @@ function deleteMerchantTx(id){
   const archiveRef = db.collection('archivedMerchantTransactions').doc();
   batch.set(archiveRef, {
     ...txData,
+    paid: txData.total, // اعتبرها مدفوعة بالكامل
+    remaining: 0,
     originalId: id,
     archivedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
@@ -2380,10 +2556,7 @@ function deleteMerchantTx(id){
   batch.delete(db.collection('merchantTransactions').doc(id));
 
   batch.commit()
-    .then(()=>{
-      // لا نحذف سجلات stockMovements الخاصة بالمعاملة، لأنها تمثل تاريخ الصرف الفعلي وتظل صحيحة
-      showToast('تم إنهاء العملية ونقلها للسجل، وتم خصم الكمية نهائياً من المخزون');
-    })
+    .then(()=>{ showToast('تم أرشفة المعاملة وخصم الكمية نهائياً من المخزون'); })
     .catch(e=> showToast('خطأ: '+e.message));
 }
 
@@ -2452,181 +2625,50 @@ function openMerchantItemsModal(tx){
 
 function renderMerchants(){
   const box = document.getElementById('merchantsCards');
+  if(!box) return;
 
-  const phoneSearchRaw = (document.getElementById('merchantPhoneSearch')?.value||'').trim();
-  const phoneSearch = normalizePhoneDigits(phoneSearchRaw);
+  const searchRaw = (document.getElementById('merchantSearch')?.value||'').trim().toLowerCase();
 
-  /* ---------- وضع البحث برقم التليفون: يظهر كل معاملات التاجر (منتهية وغير منتهية) ---------- */
-  if(phoneSearch){
-    const activeMatches = merchantTxs
-      .filter(tx=> normalizePhoneDigits(tx.phone).includes(phoneSearch))
-      .map(tx=> ({tx, archived:false}));
-    const archivedMatches = archivedMerchantTxs
-      .filter(tx=> normalizePhoneDigits(tx.phone).includes(phoneSearch))
-      .map(tx=> ({tx, archived:true}));
+  let list = merchantProfiles;
+  if(searchRaw){
+    list = list.filter(p=>
+      (p.name||'').toLowerCase().includes(searchRaw) ||
+      normalizePhoneDigits(p.phone).includes(searchRaw)
+    );
+  }
 
-    const combined = activeMatches.concat(archivedMatches)
-      .sort((a,b)=> (b.tx.date||'').localeCompare(a.tx.date||''));
-
-    if(combined.length===0){
-      box.innerHTML = `<div class="card"><div class="empty"><div class="big">🔍</div>لا توجد معاملات مسجلة بهذا الرقم.</div></div>`;
-      return;
-    }
-
-    box.innerHTML = `<div class="page-sub" style="margin-bottom:10px;">نتائج البحث: ${combined.length} معاملة (${activeMatches.length} غير منتهية، ${archivedMatches.length} منتهية)</div>` +
-      combined.map(({tx, archived})=>{
-        if(archived){
-          return `
-          <div class="merchant-card">
-            <div class="merchant-card-head">
-              <div>
-                <h3>${escapeHtml(tx.merchantName)}</h3>
-                ${tx.phone? '<div class="phone"><a href="tel:'+escapeHtml(tx.phone)+'" style="color:inherit; text-decoration:none;">📞 '+escapeHtml(tx.phone)+'</a></div>':''}
-              </div>
-              <span class="pill paid">منتهية</span>
-            </div>
-            <div class="m-row"><span>تاريخ العملية</span><span>${fmtDate(tx.date)}</span></div>
-            <div class="m-row items-row"><span>عدد الأصناف</span>${txItemIconsHtml(tx)}<span>${(tx.items||[]).length}</span></div>
-            <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
-            <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
-            <div class="actions">
-              <button class="btn btn-outline btn-sm" onclick='openArchivedStatementModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>📄 عرض التفاصيل</button>
-            </div>
-          </div>`;
-        }
-        return `
-        <div class="merchant-card">
-          <div class="merchant-card-head">
-            <div>
-              <h3>${escapeHtml(tx.merchantName)}</h3>
-              ${tx.phone? '<div class="phone"><a href="tel:'+escapeHtml(tx.phone)+'" style="color:inherit; text-decoration:none;">📞 '+escapeHtml(tx.phone)+'</a></div>':''}
-            </div>
-            <span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span>
-          </div>
-          <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
-          ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${fmtDate(tx.dueDate)}</span></div>`:''}
-          <div class="m-row items-row"><span>عدد الأصناف</span>${txItemIconsHtml(tx)}<span>${(tx.items||[]).length}</span></div>
-          <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
-          <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
-          <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
-          <div class="actions">
-            <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
-            <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
-            <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
-          </div>
-        </div>`;
-      }).join('');
+  if(list.length===0){
+    box.innerHTML = `<div class="card"><div class="empty"><div class="big">🤝</div>${merchantProfiles.length===0?'لا يوجد تجار مسجلون بعد. اضغط \"إضافة تاجر\" للبدء.':'لا توجد نتائج مطابقة لبحثك.'}</div></div>`;
     return;
   }
 
-  /* ---------- الوضع الافتراضي: العمليات غير المنتهية فقط ---------- */
-  const nameFilter = (document.getElementById('filterMerchantName')?.value||'').trim().toLowerCase();
-  const statusFilter = document.getElementById('filterMerchantStatus')?.value||'';
-  const fromFilter = document.getElementById('filterMerchantFrom')?.value||'';
-  const toFilter = document.getElementById('filterMerchantTo')?.value||'';
-
-  const filtered = merchantTxs.filter(tx=>{
-    if(nameFilter && !(tx.merchantName||'').toLowerCase().includes(nameFilter)) return false;
-    if(fromFilter && tx.date && tx.date < fromFilter) return false;
-    if(toFilter && tx.date && tx.date > toFilter) return false;
-    if(statusFilter){
-      if(statusFilter==='overdue'){ if(!isOverdue(tx)) return false; }
-      else if(paymentPillClass(tx) !== statusFilter) return false;
-    }
-    return true;
-  });
-
-  if(filtered.length===0){
-    box.innerHTML = `<div class="card"><div class="empty"><div class="big">🤝</div>${merchantTxs.length===0?'لا توجد عمليات تجار بعد.':'لا توجد عمليات مطابقة لبحثك.'}</div></div>`;
-    return;
-  }
-  box.innerHTML = filtered.map(tx=>`
+  box.innerHTML = list.map(p=>{
+    const ops = getMerchantOperationRows(p);
+    const totalBought = ops.reduce((s,r)=> s + (Number(r.subtotal)||0), 0);
+    const lastOp = ops.length ? ops[0].date : '';
+    return `
     <div class="merchant-card">
       <div class="merchant-card-head">
         <div>
-          <h3>${escapeHtml(tx.merchantName)}</h3>
-          ${tx.phone? '<div class="phone"><a href="tel:'+escapeHtml(tx.phone)+'" style="color:inherit; text-decoration:none;">📞 '+escapeHtml(tx.phone)+'</a></div>':''}
+          <h3>${escapeHtml(p.name)}</h3>
+          ${p.phone? `<div class="phone"><a href="tel:${escapeHtml(p.phone)}" style="color:inherit; text-decoration:none;">📞 ${escapeHtml(p.phone)}</a></div>`:''}
+          ${p.address? `<div class="phone">📍 ${escapeHtml(p.address)}</div>`:''}
         </div>
-        <span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span>
+        <span class="pill paid">${ops.length} عملية</span>
       </div>
-      <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
-      ${tx.dueDate? `<div class="m-row"><span>تاريخ الاستحقاق</span><span>${fmtDate(tx.dueDate)}</span></div>`:''}
-      <div class="m-row items-row"><span>عدد الأصناف</span>${txItemIconsHtml(tx)}<span>${(tx.items||[]).length}</span></div>
-      <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
-      <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
-      <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
+      ${lastOp? `<div class="m-row"><span>آخر عملية</span><span>${fmtDate(lastOp)}</span></div>`:''}
+      <div class="m-row"><span>إجمالي المشتريات</span><span>${fmt(totalBought)}</span></div>
       <div class="actions">
-        <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantModal(${JSON.stringify(tx).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
-        <button class="btn btn-outline btn-sm" onclick='openStatementModal(${JSON.stringify(tx.merchantName).replace(/'/g,"&apos;")})'>📄 كشف حساب</button>
-        <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantTx('${tx.id}')">🗑 حذف</button>
+        <button class="btn btn-outline btn-sm" onclick='openMerchantHistoryModal(${JSON.stringify(p).replace(/'/g,"&apos;")})'>📋 سجل المشتريات</button>
+        <button class="btn btn-outline btn-sm edit-action" onclick='openMerchantProfileModal(${JSON.stringify(p).replace(/'/g,"&apos;")})'>✏️ تعديل</button>
+        <button class="btn btn-danger btn-sm edit-action" onclick="deleteMerchantProfile('${p.id}')">🗑 حذف</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-/* ===================== MERCHANT STATEMENT ===================== */
-function openStatementModal(merchantName){
-  const txs = merchantTxs.filter(t=> t.merchantName === merchantName).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-  if(txs.length===0){ showToast('لا توجد عمليات لهذا التاجر'); return; }
-
-  const totalAll = txs.reduce((s,t)=> s+(Number(t.total)||0), 0);
-  const paidAll = txs.reduce((s,t)=> s+(Number(t.paid)||0), 0);
-  const remainingAll = totalAll - paidAll;
-  const phone = txs.find(t=>t.phone)?.phone || '';
-
-  const allPayments = [];
-  txs.forEach(t=> (t.payments||[]).forEach(p=> allPayments.push(p)));
-  allPayments.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-
-  const itemsAgg = {};
-  txs.forEach(t=> (t.items||[]).forEach(it=>{
-    const key = (it.itemName||'') + '||' + (it.color||'') + '||' + (it.itemDate||t.date||'');
-    if(!itemsAgg[key]) itemsAgg[key] = {itemName: it.itemName||'', color: it.color||'', qty:0, subtotal:0, itemDate: it.itemDate||t.date||''};
-    itemsAgg[key].qty += Number(it.qty)||0;
-    itemsAgg[key].subtotal += Number(it.subtotal)||0;
-  }));
-  const itemsAggList = Object.values(itemsAgg).sort((a,b)=> (a.itemDate||'').localeCompare(b.itemDate||''));
-
-  document.getElementById('statementTitle').textContent = 'كشف حساب: ' + merchantName;
-  document.getElementById('statementBody').innerHTML = `
-    <div id="statementPrintArea">
-      <h2 style="margin-bottom:4px;">${escapeHtml(merchantName)}</h2>
-      ${phone? `<p class="page-sub" style="margin-bottom:14px;"><a href="tel:${escapeHtml(phone)}" style="color:inherit; text-decoration:none;">📞 ${escapeHtml(phone)}</a></p>`:'<div style="margin-bottom:14px;"></div>'}
-
-      <div class="section-head" style="margin:10px 0 8px;"><h2 style="font-size:14px;">العمليات</h2></div>
-      <table>
-        <thead><tr><th>التاريخ</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
-        <tbody>
-          ${txs.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${(t.items||[]).length}</td><td class="money">${fmt(t.total)}</td><td class="money">${fmt(t.paid)}</td><td class="money">${fmt(t.remaining)}</td></tr>`).join('')}
-        </tbody>
-      </table>
-
-      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">الأصناف المشتراة</h2></div>
-      <table>
-        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th>عدد الوحدات</th><th>الإجمالي</th></tr></thead>
-        <tbody>
-          ${itemsAggList.length ? itemsAggList.map(a=>`<tr><td>${a.itemDate ? fmtDate(a.itemDate) : '-'}</td><td>${escapeHtml(a.itemName)}</td><td>${escapeHtml(a.color||'-')}</td><td class="money">${fmt(a.qty)}</td><td class="money">${fmt(a.subtotal)}</td></tr>`).join('') : '<tr><td colspan="5"><div class="empty">لا توجد أصناف.</div></td></tr>'}
-        </tbody>
-      </table>
-
-      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">الدفعات</h2></div>
-      <table>
-        <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th></tr></thead>
-        <tbody>
-          ${allPayments.length ? allPayments.map(p=>`<tr><td>${fmtDate(p.date)}</td><td class="money">${fmt(p.amount)}</td><td>${escapeHtml(p.note||'')}</td></tr>`).join('') : '<tr><td colspan="3"><div class="empty">لا توجد دفعات مسجلة.</div></td></tr>'}
-        </tbody>
-      </table>
-
-      <div class="totals-box" style="margin-top:18px;">
-        <div class="line big"><span>إجمالي كل العمليات</span><span>${fmt(totalAll)}</span></div>
-        <div class="line"><span>إجمالي المدفوع</span><span>${fmt(paidAll)}</span></div>
-        <div class="line remain"><span>المتبقي الإجمالي</span><span>${fmt(remainingAll)}</span></div>
-      </div>
-    </div>
-  `;
-  document.getElementById('statementModalOverlay').classList.add('active');
-  currentStatementExport = {merchantName, phone, txs, itemsAggList, allPayments, totalAll, paidAll, remainingAll};
-}
+/* ===================== MERCHANT STATEMENT (legacy archived data) ===================== */
+function openStatementModal(merchantName){ showToast('استخدم سجل المشتريات من قسم التجار'); }
 
 function printStatement(){
   document.body.classList.add('printing-statement');
@@ -2666,50 +2708,92 @@ function setDailySalesToday(){
   renderDailySales();
 }
 
-/* بيجمع كل الأصناف المباعة (من التجار النشطين والمؤرشفين) اللي تاريخ صرفها الفعلي (itemDate) هو نفس اليوم المحدد */
-function getDailySalesRows(day){
-  const rows = [];
-  const allTxs = [...merchantTxs, ...archivedMerchantTxs];
-  allTxs.forEach(t=>{
-    (t.items||[]).forEach(it=>{
-      const d = it.itemDate || t.date || '';
-      if(day && d!==day) return;
+/* كل عمليات البيع مجمّعة من مصدرين: المبيعات الحالية (saleEntries) + السجل القديم (merchantTxs + archivedMerchantTxs)
+   بنفس شكل صف المبيعات، مع ربط merchantId بملف التاجر (عن طريق مطابقة الاسم) لو موجود، حتى يعمل فلتر التاجر على الاثنين معًا */
+function getUnifiedSaleRows(){
+  const rows = saleEntries.map(r=> ({
+    id: r.id,
+    date: r.date,
+    merchantId: r.merchantId,
+    merchantName: r.merchantName,
+    itemId: r.itemId,
+    itemName: r.itemName,
+    sku: r.sku,
+    color: r.color,
+    qty: r.qty,
+    price: r.price,
+    source: 'sale',
+    sourceLabel: 'عملية حالية'
+  }));
+
+  const legacyTagged = [
+    ...merchantTxs.map(tx=> ({tx, sourceLabel:'سجل قديم — مفتوحة'})),
+    ...archivedMerchantTxs.map(tx=> ({tx, sourceLabel:'سجل قديم — مؤرشفة'}))
+  ];
+  legacyTagged.forEach(({tx, sourceLabel})=>{
+    const nameKey = normalizeMerchantName(tx.merchantName);
+    const profile = merchantProfiles.find(p=> normalizeMerchantName(p.name)===nameKey);
+    (tx.items||[]).forEach((it,idx)=>{
       rows.push({
-        date: d, merchantName: t.merchantName||'', itemId: it.itemId||'', itemName: it.itemName||'',
-        color: it.color||'', qty: Number(it.qty)||0
+        id: tx.id+'_'+idx,
+        date: it.itemDate || tx.date,
+        merchantId: profile ? profile.id : null,
+        merchantName: tx.merchantName,
+        itemId: it.itemId || null,
+        itemName: it.itemName,
+        sku: '-',
+        color: it.color||'',
+        qty: it.qty,
+        price: it.unitPrice,
+        source: 'legacy',
+        sourceLabel
       });
     });
   });
-  rows.sort((a,b)=> (a.merchantName||'').localeCompare(b.merchantName||''));
+
+  return rows;
+}
+
+function getDailySalesRows(day, merchantId){
+  let rows = getUnifiedSaleRows();
+  if(day) rows = rows.filter(r=> r.date===day);
+  if(merchantId) rows = rows.filter(r=> r.merchantId===merchantId);
+  rows.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (a.merchantName||'').localeCompare(b.merchantName||''));
   return rows;
 }
 
 function renderDailySales(){
-  const day = document.getElementById('dsFilterDate').value || '';
-  const rows = getDailySalesRows(day);
+  const day = document.getElementById('dsFilterDate')?.value || '';
+  const merchantId = document.getElementById('dsFilterMerchant')?.value || '';
+  const rows = getDailySalesRows(day, merchantId);
 
   const titleEl = document.getElementById('dailySalesTitle');
   titleEl.textContent = day ? 'مبيعات يوم ' + fmtDate(day) : 'كل المبيعات';
 
   const tbody = document.querySelector('#dailySalesTable tbody');
+  if(!tbody) return;
   tbody.innerHTML = rows.length ? rows.map(r=>{
     const item = items.find(i=> i.id===r.itemId);
     const img = item && item.image;
-    const sku = item && item.sku ? item.sku : '-';
     const thumbCell = img
       ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
       : `<div class="ds-thumb">📦</div>`;
+    const deleteCell = r.source==='sale'
+      ? `<button class="btn btn-danger btn-sm edit-action" onclick="deleteSaleEntry('${r.id}','${r.itemId}',${JSON.stringify(r.itemName)},${r.qty},'${r.date}')">🗑</button>`
+      : '';
     return `
     <tr>
       <td>${r.date ? fmtDate(r.date) : '-'}</td>
-      <td>${escapeHtml(r.merchantName)}</td>
+      <td>${escapeHtml(r.merchantName||'-')}</td>
       <td>${escapeHtml(r.itemName)}</td>
-      <td>${escapeHtml(sku)}</td>
+      <td>${escapeHtml(r.sku||'-')}</td>
       <td>${escapeHtml(r.color||'-')}</td>
       <td class="money">${fmt(r.qty)}</td>
+      <td class="money">${fmt(r.price)}</td>
       <td>${thumbCell}</td>
+      <td>${deleteCell}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="7"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
+  }).join('') : `<tr><td colspan="9"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
 
   currentDailySalesExport = {day, rows};
 }
@@ -2726,10 +2810,9 @@ function exportDailySalesCsv(){
   const rows = [['المبيعات اليومية']];
   rows.push([s.day ? fmtDate(s.day) : '']);
   rows.push([]);
-  rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية']);
+  rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية','السعر','الإجمالي']);
   s.rows.forEach(r=>{
-    const item = items.find(i=> i.id===r.itemId);
-    rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName, r.itemName, (item&&item.sku)||'-', r.color||'', r.qty]);
+    rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName||'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.price, (Number(r.qty)||0)*(Number(r.price)||0)]);
   });
   downloadCsv('المبيعات اليومية.csv', rows);
 }
@@ -2743,44 +2826,7 @@ function normalizePhoneForWhatsapp(phone){
   return digits;
 }
 
-function sendStatementWhatsapp(){
-  if(!currentStatementExport){ showToast('لا يوجد كشف حساب مفتوح'); return; }
-  const s = currentStatementExport;
-  if(!s.phone){ showToast('لا يوجد رقم تليفون مسجل لهذا التاجر'); return; }
-  const waNumber = normalizePhoneForWhatsapp(s.phone);
-
-  let msg = `*كشف حساب: ${s.merchantName}*\n\n`;
-
-  msg += `*العمليات*\n`;
-  s.txs.forEach(t=>{
-    msg += `${fmtDate(t.date)} — أصناف: ${(t.items||[]).length} — الإجمالي: ${fmt(t.total)} — المدفوع: ${fmt(t.paid)} — المتبقي: ${fmt(t.remaining)}\n`;
-  });
-
-  msg += `\n*الأصناف المشتراة*\n`;
-  if(s.itemsAggList.length){
-    s.itemsAggList.forEach(a=>{
-      msg += `${a.itemDate ? fmtDate(a.itemDate)+' — ' : ''}${a.itemName}${a.color? ' - '+a.color : ''} — عدد: ${fmt(a.qty)} — الإجمالي: ${fmt(a.subtotal)}\n`;
-    });
-  } else {
-    msg += `لا توجد أصناف.\n`;
-  }
-
-  msg += `\n*الدفعات*\n`;
-  if(s.allPayments.length){
-    s.allPayments.forEach(p=>{
-      msg += `${fmtDate(p.date)} — ${fmt(p.amount)}${p.note? ' — '+p.note : ''}\n`;
-    });
-  } else {
-    msg += `لا توجد دفعات مسجلة.\n`;
-  }
-
-  msg += `\n*الإجماليات*\n` +
-    `إجمالي كل العمليات: ${fmt(s.totalAll)}\n` +
-    `إجمالي المدفوع: ${fmt(s.paidAll)}\n` +
-    `المتبقي الإجمالي: ${fmt(s.remainingAll)}`;
-
-  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-}
+function sendStatementWhatsapp(){ showToast('استخدم زر الواتساب من نافذة سجل المشتريات'); }
 
 function renderDashboard(){
   const activeItems = items.filter(i=>!i.archived);
@@ -2789,13 +2835,13 @@ function renderDashboard(){
   const totalIssued = activeItems.reduce((s,i)=> s + issuedQtyFor(i.id), 0);
   const totalRemaining = totalStock - totalIssued;
   const stockValue = activeItems.reduce((s,i)=> s + (Number(i.stockQty)||0)*(Number(i.price)||0), 0);
-  const receivables = merchantTxs.reduce((s,t)=> s + (Number(t.remaining)||0), 0);
+  const revenue = saleEntries.reduce((s,r)=> s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
 
   document.getElementById('statTotalStock').textContent = fmt(totalStock);
   document.getElementById('statTotalIssued').textContent = fmt(totalIssued);
   document.getElementById('statTotalRemaining').textContent = fmt(totalRemaining);
   document.getElementById('statStockValue').textContent = fmt(stockValue);
-  document.getElementById('statReceivables').textContent = fmt(receivables);
+  document.getElementById('statRevenue').textContent = fmt(revenue);
 
   const auditItems = [...activeItems].sort((a,b)=> (a.name||'').localeCompare(b.name||'','ar'));
   const auditBox = document.getElementById('stockAuditList');
@@ -2833,19 +2879,18 @@ function renderDashboard(){
     }).join('') : `<p class="page-sub" style="margin:0;">لا توجد أصناف بعد.</p>`;
   }
 
-  const recent = [...merchantTxs].slice(0,6);
+  const recent = [...saleEntries].slice(0,6);
   const recentBox = document.getElementById('recentMerchantsList');
-  recentBox.innerHTML = recent.length ? recent.map(tx=>`
+  recentBox.innerHTML = recent.length ? recent.map(r=>`
     <div class="merchant-card">
       <div class="merchant-card-head">
-        <div><h3>${escapeHtml(tx.merchantName)}</h3></div>
-        <span class="pill ${paymentPillClass(tx)}">${paymentPillLabel(tx)}</span>
+        <div><h3>${escapeHtml(r.merchantName||'-')}</h3></div>
+        <span class="pill paid">${fmtDate(r.date)}</span>
       </div>
-      <div class="m-row"><span>التاريخ</span><span>${fmtDate(tx.date)}</span></div>
-      <div class="m-row"><span>الإجمالي</span><span>${fmt(tx.total)}</span></div>
-      <div class="m-row"><span>المدفوع</span><span>${fmt(tx.paid)}</span></div>
-      <div class="m-row remaining"><span>المتبقي</span><span>${fmt(tx.remaining)}</span></div>
-    </div>`).join('') : `<div class="card"><div class="empty">لا توجد عمليات بعد.</div></div>`;
+      <div class="m-row"><span>الصنف</span><span>${escapeHtml(r.itemName)}</span></div>
+      <div class="m-row"><span>الكمية</span><span>${fmt(r.qty)}</span></div>
+      <div class="m-row"><span>الإجمالي</span><span>${fmt((Number(r.qty)||0)*(Number(r.price)||0))}</span></div>
+    </div>`).join('') : `<div class="card"><div class="empty">لا توجد مبيعات بعد.</div></div>`;
 }
 
 /* ===================== BOOT ===================== */
@@ -2854,7 +2899,9 @@ function renderDashboard(){
   if(config){
     initFirebaseWithConfig(config);
   }
-  document.getElementById('merchantDate').value = new Date().toISOString().slice(0,10);
+  const today = new Date().toISOString().slice(0,10);
+  const saleDateEl = document.getElementById('saleDate');
+  if(saleDateEl) saleDateEl.value = today;
 })();
 </script>
 </body>
