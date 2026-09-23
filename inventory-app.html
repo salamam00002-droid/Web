@@ -309,6 +309,39 @@
   }
   .filters-row .field{margin-bottom:0; flex:1; min-width:140px;}
   .filters-row .field.grow2{flex:2;}
+
+  /* ---------- daily sales monthly calendar (مصغّر قدر الإمكان) ---------- */
+  .ds-calendar{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    padding:8px; margin:0 auto 16px; box-shadow:var(--shadow);
+    max-width:230px;
+  }
+  .ds-calendar-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:4px;}
+  .ds-calendar-title{font-size:11px; font-weight:800; font-family:'Cairo',sans-serif; color:var(--ink);}
+  .ds-calendar-nav{display:flex; gap:3px;}
+  .ds-calendar-nav button{
+    background:var(--cream); border:1px solid var(--line); border-radius:5px; width:19px; height:19px;
+    font-weight:800 !important; cursor:pointer; color:var(--ink-2); font-size:10px !important; padding:0 !important; line-height:1;
+  }
+  .ds-calendar-nav button:hover{background:var(--gold-dark); color:#fff; border-color:var(--gold-dark);}
+  .ds-calendar-head .btn-sm{padding:3px 7px !important; font-size:9.5px !important;}
+  .ds-calendar-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px;}
+  .ds-calendar-daylabel{font-size:8px; font-weight:800; color:var(--muted); text-align:center; padding-bottom:2px;}
+  .ds-calendar-day{
+    display:flex; align-items:center; justify-content:center; aspect-ratio:1/1;
+    border-radius:4px; cursor:pointer; font-weight:700; font-size:9px;
+    border:1px solid var(--line); position:relative; color:var(--ink-2);
+  }
+  .ds-calendar-day:hover{background:var(--cream); border-color:var(--gold-dark);}
+  .ds-calendar-day.ds-empty{visibility:hidden; cursor:default; border-color:transparent;}
+  .ds-calendar-day.ds-today{border-color:var(--gold-dark); border-width:2px;}
+  .ds-calendar-day.ds-selected{background:var(--gold-dark); border-color:var(--gold-dark); color:#fff;}
+  .ds-calendar-day.ds-inrange{background:var(--cream);}
+  .ds-calendar-day .ds-dot{
+    position:absolute; bottom:1px; left:50%; transform:translateX(-50%);
+    width:3px; height:3px; border-radius:50%; background:var(--green);
+  }
+  .ds-calendar-day.ds-selected .ds-dot{background:#fff;}
   .link-btn{background:none; border:none; color:var(--gold-dark); font-weight:700; font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;}
   .category-chip{display:inline-block; background:var(--cream); border:1px solid var(--line); color:var(--muted); font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; margin-inline-end:6px;}
   .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
@@ -512,6 +545,90 @@
   input, select, textarea, label, button{
     font-size:14px !important;
     font-weight:700 !important;
+  }
+
+  /* ================================================================
+     تحسين شامل لعرض الموبايل لكل أقسام التطبيق
+     ================================================================ */
+  @media(max-width:600px){
+    /* ---- الهيدر والقائمة العلوية ---- */
+    header{padding:10px 12px; gap:8px;}
+    header .brand{font-size:15px; gap:6px;}
+    header .brand .brand-logo{height:26px; width:26px;}
+    header .brand .tag{font-size:9px; padding:2px 7px;}
+    #connStatus{font-size:10px; gap:4px;}
+    #connStatus span:not(.dot){display:none;}
+    .notif-bell{font-size:16px;}
+    nav{top:50px; padding:0 8px;}
+    nav button{padding:10px 10px; font-size:12.5px;}
+
+    /* ---- المحتوى الرئيسي ---- */
+    main{padding:14px 10px;}
+    .page-title{font-size:18px;}
+    .page-sub{font-size:12px; margin-bottom:14px;}
+    .section-head{margin:18px 0 8px;}
+    .section-head h2{font-size:14.5px;}
+
+    /* ---- كروت الإحصائيات ---- */
+    .stats-grid{grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:18px;}
+    .stat-card{padding:12px;}
+    .stat-card .label{font-size:10.5px;}
+    .stat-card .value{font-size:22px; margin-top:4px;}
+
+    /* ---- الكروت العامة ---- */
+    .card{padding:14px;}
+
+    /* ---- صف الفلاتر ---- */
+    .filters-row{flex-direction:column; align-items:stretch; padding:12px; gap:8px;}
+    .filters-row .field, .filters-row .field.grow2{flex:1 1 100%; min-width:0;}
+
+    /* ---- شبكة الأصناف والفورم ---- */
+    .items-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;}
+    .item-card{padding:11px;}
+    .item-card .thumb{height:90px;}
+    .item-card h3{font-size:13.5px;}
+    .item-name-big{font-size:17px !important;}
+    .form-grid{grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px;}
+
+    /* ---- كروت التجار ---- */
+    .merchant-card{padding:13px 14px;}
+    .merchant-profile-card{padding:14px; flex-direction:column; align-items:flex-start;}
+
+    /* ---- الجداول: تمرير أفقي سلس وخط أصغر ---- */
+    table, table *{font-size:12px !important;}
+    th{padding:6px 6px;}
+    td{padding:7px 6px;}
+    .merchant-history-table{font-size:11.5px;}
+
+    /* ---- النوافذ المنبثقة (Modal) بملء الشاشة تقريبًا ---- */
+    .overlay{padding:0; align-items:flex-end;}
+    .modal{
+      max-width:100%; width:100%; max-height:92vh;
+      border-radius:16px 16px 0 0;
+    }
+    .modal-head{padding:14px 16px;}
+    .modal-body{padding:14px 16px;}
+    .modal-foot{padding:12px 16px; flex-wrap:wrap;}
+
+    /* ---- التوتال والفواتير ---- */
+    .totals-box{padding:12px 14px;}
+    .sale-entry-card{padding:14px;}
+
+    /* ---- لوحة التنبيهات ---- */
+    .notif-panel{width:260px; max-width:calc(100vw - 16px);}
+
+    /* ---- تصغير كالندر المبيعات اليومية أكثر على الشاشات الصغيرة ---- */
+    .ds-calendar{max-width:190px; padding:6px;}
+    .ds-calendar-title{font-size:9.5px;}
+    .ds-calendar-nav button{width:16px !important; height:16px !important; font-size:9px !important;}
+    .ds-calendar-day{font-size:7.5px; border-radius:3px;}
+    .ds-calendar-daylabel{font-size:7px;}
+    .ds-calendar-grid{gap:1.5px;}
+  }
+
+  @media(max-width:380px){
+    .stats-grid{grid-template-columns:1fr;}
+    .ds-calendar{max-width:165px;}
   }
 
   @media print{
@@ -773,11 +890,28 @@
       </div>
     </div>
 
+    <!-- كالندر شهري لاختيار يوم المبيعات -->
+    <div class="ds-calendar">
+      <div class="ds-calendar-head">
+        <div class="ds-calendar-nav">
+          <button type="button" onclick="dsCalendarChangeMonth(-1)">‹</button>
+          <button type="button" onclick="dsCalendarChangeMonth(1)">›</button>
+        </div>
+        <div class="ds-calendar-title" id="dsCalendarTitle"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="dsCalendarGoToday()">اليوم</button>
+      </div>
+      <div class="ds-calendar-grid" id="dsCalendarGrid"></div>
+    </div>
+
     <!-- سجل المبيعات -->
     <div class="filters-row">
       <div class="field">
-        <label>اليوم</label>
-        <input id="dsFilterDate" type="date" onchange="renderDailySales()">
+        <label>من تاريخ</label>
+        <input id="dsFilterDateFrom" type="date" onchange="onDsFilterDateChanged()">
+      </div>
+      <div class="field">
+        <label>إلى تاريخ</label>
+        <input id="dsFilterDateTo" type="date" onchange="onDsFilterDateChanged()">
       </div>
       <div class="field">
         <label>فلتر بالتاجر</label>
@@ -789,14 +923,7 @@
 
     <div id="dailySalesPrintArea">
       <h2 id="dailySalesTitle" style="margin-bottom:4px;">مبيعات اليوم</h2>
-
-      <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">تفاصيل الأصناف المباعة</h2></div>
-      <div class="card" style="overflow-x:auto;">
-        <table id="dailySalesTable">
-          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <div id="dailySalesDaysContainer"></div>
     </div>
   </div>
 
@@ -1085,6 +1212,7 @@ let saleEntries = []; // {id, date, merchantId, merchantName, itemId, itemName, 
 let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
+let dsCalendarMonth = null; // Date (يوم 1 من الشهر المعروض حالياً في كالندر المبيعات اليومية)
 let currentStatementExport = null;
 let currentMerchantHistoryExport = null;
 let storage;
@@ -1182,7 +1310,7 @@ function switchView(name){
   if(name==='dailysales'){
     populateSaleMerchantSelect();
     populateSaleItemSelect();
-    if(!document.getElementById('dsFilterDate').value) setDailySalesToday();
+    if(!document.getElementById('dsFilterDateFrom').value) setDailySalesToday();
     else renderDailySales();
   }
   if(name==='merchants') renderMerchants();
@@ -2762,7 +2890,8 @@ let currentDailySalesExport = null;
 
 function setDailySalesToday(){
   const today = new Date().toISOString().slice(0,10);
-  document.getElementById('dsFilterDate').value = today;
+  document.getElementById('dsFilterDateFrom').value = today;
+  document.getElementById('dsFilterDateTo').value = today;
   renderDailySales();
 }
 
@@ -2812,48 +2941,177 @@ function getUnifiedSaleRows(){
   return rows;
 }
 
-function getDailySalesRows(day, merchantId){
+/* fromDay/toDay بصيغة YYYY-MM-DD؛ أي منهم يقدر يبقى فاضي (فلتر مفتوح من جهة واحدة أو من غير فلتر تاريخ خالص) */
+function getDailySalesRows(fromDay, toDay, merchantId){
   let rows = getUnifiedSaleRows();
-  if(day) rows = rows.filter(r=> r.date===day);
+  if(fromDay) rows = rows.filter(r=> (r.date||'') >= fromDay);
+  if(toDay) rows = rows.filter(r=> (r.date||'') <= toDay);
   if(merchantId) rows = rows.filter(r=> r.merchantId===merchantId);
-  rows.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (a.merchantName||'').localeCompare(b.merchantName||''));
+  rows.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.merchantName||'').localeCompare(b.merchantName||''));
   return rows;
 }
 
+/* ===================== DAILY SALES: MONTHLY CALENDAR ===================== */
+function parseYmd(str){
+  const m = String(str||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  return {y:Number(m[1]), mo:Number(m[2]), d:Number(m[3])};
+}
+
+function ensureDsCalendarMonth(){
+  if(dsCalendarMonth) return;
+  const parsed = parseYmd(document.getElementById('dsFilterDateFrom')?.value);
+  if(parsed){ dsCalendarMonth = new Date(parsed.y, parsed.mo-1, 1); return; }
+  const t = parseYmd(new Date().toISOString().slice(0,10));
+  dsCalendarMonth = new Date(t.y, t.mo-1, 1);
+}
+
+function dsCalendarChangeMonth(delta){
+  ensureDsCalendarMonth();
+  dsCalendarMonth = new Date(dsCalendarMonth.getFullYear(), dsCalendarMonth.getMonth()+delta, 1);
+  renderDsCalendarGrid();
+}
+
+function dsCalendarGoToday(){
+  const todayStr = new Date().toISOString().slice(0,10);
+  const t = parseYmd(todayStr);
+  dsCalendarMonth = new Date(t.y, t.mo-1, 1);
+  document.getElementById('dsFilterDateFrom').value = todayStr;
+  document.getElementById('dsFilterDateTo').value = todayStr;
+  renderDailySales();
+}
+
+/* اختيار فترة من الكالندر بنفس أسلوب أي date-range picker:
+   أول ضغطة تبدأ فترة جديدة (من = إلى = اليوم ده)، والضغطة اللي بعدها بتوسّع الفترة
+   لغاية اليوم المختار (سواء قبل "من" أو بعد "إلى")، وبعد ما الفترة تكتمل أي ضغطة جديدة تبدأ فترة تانية من الأول */
+function dsCalendarSelectDay(dateStr){
+  const fromEl = document.getElementById('dsFilterDateFrom');
+  const toEl = document.getElementById('dsFilterDateTo');
+  const from = fromEl.value, to = toEl.value;
+  if(!from || (from && to)){
+    fromEl.value = dateStr; toEl.value = dateStr;
+  } else {
+    if(dateStr < from){ toEl.value = from; fromEl.value = dateStr; }
+    else { toEl.value = dateStr; }
+  }
+  renderDailySales();
+}
+
+function onDsFilterDateChanged(){
+  const parsed = parseYmd(document.getElementById('dsFilterDateFrom')?.value) || parseYmd(document.getElementById('dsFilterDateTo')?.value);
+  if(parsed) dsCalendarMonth = new Date(parsed.y, parsed.mo-1, 1);
+  renderDailySales();
+}
+
+function renderDsCalendarGrid(){
+  const grid = document.getElementById('dsCalendarGrid');
+  const titleEl = document.getElementById('dsCalendarTitle');
+  if(!grid || !titleEl) return;
+  ensureDsCalendarMonth();
+
+  const year = dsCalendarMonth.getFullYear();
+  const month = dsCalendarMonth.getMonth(); // 0-based
+  const monthNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  titleEl.textContent = monthNames[month] + ' ' + year;
+
+  const dayLabels = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
+  const startOffset = new Date(year, month, 1).getDay(); // 0=أحد
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0,10);
+  const fromDate = document.getElementById('dsFilterDateFrom')?.value || '';
+  const toDate = document.getElementById('dsFilterDateTo')?.value || '';
+
+  /* أيام الشهر ده اللي فيها مبيعات مسجلة (عشان نعرض نقطة تحت رقم اليوم) */
+  const salesDaysSet = new Set();
+  saleEntries.forEach(s=>{
+    const p = parseYmd(s.date);
+    if(p && p.y===year && p.mo===month+1) salesDaysSet.add(s.date);
+  });
+
+  let html = dayLabels.map(l=> `<div class="ds-calendar-daylabel">${l}</div>`).join('');
+  for(let i=0;i<startOffset;i++) html += `<div class="ds-calendar-day ds-empty">0</div>`;
+  for(let day=1; day<=daysInMonth; day++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const classes = ['ds-calendar-day'];
+    if(dateStr===todayStr) classes.push('ds-today');
+    if(dateStr===fromDate || dateStr===toDate) classes.push('ds-selected');
+    else if(fromDate && toDate && dateStr>fromDate && dateStr<toDate) classes.push('ds-inrange');
+    const dot = salesDaysSet.has(dateStr) ? `<span class="ds-dot"></span>` : '';
+    html += `<div class="${classes.join(' ')}" onclick="dsCalendarSelectDay('${dateStr}')">${day}${dot}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
 function renderDailySales(){
-  const day = document.getElementById('dsFilterDate')?.value || '';
+  const fromDay = document.getElementById('dsFilterDateFrom')?.value || '';
+  const toDay = document.getElementById('dsFilterDateTo')?.value || '';
   const merchantId = document.getElementById('dsFilterMerchant')?.value || '';
-  const rows = getDailySalesRows(day, merchantId);
+  const rows = getDailySalesRows(fromDay, toDay, merchantId);
 
-  const titleEl = document.getElementById('dailySalesTitle');
-  titleEl.textContent = day ? 'مبيعات يوم ' + fmtDate(day) : 'كل المبيعات';
+  let titleText;
+  if(fromDay && toDay && fromDay===toDay) titleText = 'مبيعات يوم ' + fmtDate(fromDay);
+  else if(fromDay && toDay) titleText = 'مبيعات من ' + fmtDate(fromDay) + ' إلى ' + fmtDate(toDay);
+  else if(fromDay) titleText = 'مبيعات من ' + fmtDate(fromDay);
+  else if(toDay) titleText = 'مبيعات حتى ' + fmtDate(toDay);
+  else titleText = 'كل المبيعات';
+  document.getElementById('dailySalesTitle').textContent = titleText;
 
-  const tbody = document.querySelector('#dailySalesTable tbody');
-  if(!tbody) return;
-  tbody.innerHTML = rows.length ? rows.map(r=>{
-    const item = items.find(i=> i.id===r.itemId);
-    const img = item && item.image;
-    const thumbCell = img
-      ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
-      : `<div class="ds-thumb">📦</div>`;
-    const safeItemName = JSON.stringify(r.itemName||'').replace(/'/g, "&apos;");
-    const deleteCell = r.source==='sale'
-      ? `<button class="btn btn-danger btn-sm edit-action" onclick='deleteSaleEntry("${r.id}","${r.itemId}",${safeItemName},${r.qty},"${r.date}")'>🗑</button>`
-      : '';
+  const container = document.getElementById('dailySalesDaysContainer');
+  if(!container) return;
+
+  if(!rows.length){
+    container.innerHTML = `<div class="card"><div class="empty">لا توجد مبيعات في الفترة المحددة.</div></div>`;
+    currentDailySalesExport = {titleText, rows};
+    renderDsCalendarGrid();
+    return;
+  }
+
+  /* تجميع الصفوف يوم بيوم، كل يوم في جدول مستقل ورا التاني */
+  const byDay = [];
+  rows.forEach(r=>{
+    let group = byDay.find(g=> g.date===r.date);
+    if(!group){ group = {date: r.date, items: []}; byDay.push(group); }
+    group.items.push(r);
+  });
+
+  container.innerHTML = byDay.map(group=>{
+    const dayTotalQty = group.items.reduce((s,r)=> s + (Number(r.qty)||0), 0);
+    const rowsHtml = group.items.map(r=>{
+      const item = items.find(i=> i.id===r.itemId);
+      const img = item && item.image;
+      const thumbCell = img
+        ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
+        : `<div class="ds-thumb">📦</div>`;
+      const safeItemName = JSON.stringify(r.itemName||'').replace(/'/g, "&apos;");
+      const deleteCell = r.source==='sale'
+        ? `<button class="btn btn-danger btn-sm edit-action" onclick='deleteSaleEntry("${r.id}","${r.itemId}",${safeItemName},${r.qty},"${r.date}")'>🗑</button>`
+        : '';
+      return `
+      <tr>
+        <td>${escapeHtml(r.merchantName||'-')}</td>
+        <td>${escapeHtml(r.itemName)}</td>
+        <td>${escapeHtml(r.sku||'-')}</td>
+        <td>${escapeHtml(r.color||'-')}</td>
+        <td class="money">${fmt(r.qty)}</td>
+        <td>${thumbCell}</td>
+        <td>${deleteCell}</td>
+      </tr>`;
+    }).join('');
     return `
-    <tr>
-      <td>${r.date ? fmtDate(r.date) : '-'}</td>
-      <td>${escapeHtml(r.merchantName||'-')}</td>
-      <td>${escapeHtml(r.itemName)}</td>
-      <td>${escapeHtml(r.sku||'-')}</td>
-      <td>${escapeHtml(r.color||'-')}</td>
-      <td class="money">${fmt(r.qty)}</td>
-      <td>${thumbCell}</td>
-      <td>${deleteCell}</td>
-    </tr>`;
-  }).join('') : `<tr><td colspan="8"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
+    <div class="section-head" style="margin:18px 0 8px;">
+      <h2 style="font-size:14px;">📅 ${group.date ? fmtDate(group.date) : 'بدون تاريخ'}</h2>
+      <span class="page-sub" style="margin:0;">${fmt(dayTotalQty)} قطعة (${group.items.length} عملية)</span>
+    </div>
+    <div class="card" style="overflow-x:auto; margin-bottom:14px;">
+      <table>
+        <thead><tr><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th><th></th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 
-  currentDailySalesExport = {day, rows};
+  currentDailySalesExport = {titleText, rows};
+  renderDsCalendarGrid();
 }
 
 function printDailySales(){
@@ -2866,7 +3124,7 @@ function exportDailySalesCsv(){
   if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
   const s = currentDailySalesExport;
   const rows = [['المبيعات اليومية']];
-  rows.push([s.day ? fmtDate(s.day) : '']);
+  rows.push([s.titleText||'']);
   rows.push([]);
   rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية','السعر','الإجمالي']);
   s.rows.forEach(r=>{
