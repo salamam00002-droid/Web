@@ -793,7 +793,7 @@
       <div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">تفاصيل الأصناف المباعة</h2></div>
       <div class="card" style="overflow-x:auto;">
         <table id="dailySalesTable">
-          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>السعر</th><th>الصورة</th><th></th></tr></thead>
+          <thead><tr><th>التاريخ</th><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -2848,11 +2848,10 @@ function renderDailySales(){
       <td>${escapeHtml(r.sku||'-')}</td>
       <td>${escapeHtml(r.color||'-')}</td>
       <td class="money">${fmt(r.qty)}</td>
-      <td class="money">${fmt(r.price)}</td>
       <td>${thumbCell}</td>
       <td>${deleteCell}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="9"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
+  }).join('') : `<tr><td colspan="8"><div class="empty">لا توجد مبيعات في اليوم المحدد.</div></td></tr>`;
 
   currentDailySalesExport = {day, rows};
 }
