@@ -554,7 +554,6 @@
   <button data-view="remaining">المخزون المتبقي</button>
   <button data-view="movements">سجل الحركة</button>
   <button data-view="merchants">التجار</button>
-  <button data-view="archived">المعاملات المنتهية</button>
 </nav>
 
 <main>
@@ -750,7 +749,7 @@
         </div>
         <div class="field" id="saleColorField" style="display:none;">
           <label>اللون</label>
-          <select id="saleColorSelect">
+          <select id="saleColorSelect" onchange="updateSaleAvailabilityHint()">
             <option value="">اختر اللون</option>
           </select>
         </div>
@@ -760,7 +759,8 @@
         </div>
         <div class="field">
           <label>الكمية</label>
-          <input id="saleQty" type="number" min="1" value="1" placeholder="الكمية">
+          <input id="saleQty" type="number" min="1" value="1" placeholder="الكمية" oninput="updateSaleAvailabilityHint()">
+          <div id="saleAvailabilityHint" style="font-size:11.5px; margin-top:4px; color:var(--muted);"></div>
         </div>
         <div class="field">
           <label>السعر (تلقائي)</label>
@@ -823,7 +823,10 @@
     <div id="merchantsCards"></div>
   </div>
 
-  <!-- ========== ARCHIVED (COMPLETED) TRANSACTIONS VIEW ========== -->
+  <!-- ========== ARCHIVED (COMPLETED) TRANSACTIONS VIEW ==========
+       تم إخفاء هذا القسم من القائمة الرئيسية بناءً على طلب المستخدم (كل المعاملات القديمة اتقفلت ومالهاش استخدام حاليًا).
+       البيانات نفسها لسه محفوظة في قاعدة البيانات (archivedMerchantTransactions) والدوال (renderArchived, listenToArchivedMerchantTxs...)
+       لسه شغالة في الخلفية. لاسترجاع القسم: احذف علامات التعليق دي، ورجّع زرار "المعاملات المنتهية" في <nav>.
   <div id="view-archived" class="view">
     <div class="section-head" style="margin-top:0;">
       <div>
@@ -833,6 +836,7 @@
     </div>
     <div id="archivedCards"></div>
   </div>
+  -->
 
 
 </main>
@@ -2304,6 +2308,7 @@ function onSaleItemSelect(){
     document.getElementById('salePrice').value = '';
     document.getElementById('saleSku').value = '';
     document.getElementById('saleColorField').style.display = 'none';
+    updateSaleAvailabilityHint();
     return;
   }
   document.getElementById('salePrice').value = opt.getAttribute('data-price')||'';
@@ -2321,6 +2326,29 @@ function onSaleItemSelect(){
     colorSel.innerHTML = '';
     colorField.style.display = 'none';
   }
+  updateSaleAvailabilityHint();
+}
+
+/* يعرض الكمية المتاحة فعليًا بالمخزن للصنف (واللون لو محدد) المختارين في نموذج البيع */
+function updateSaleAvailabilityHint(){
+  const hint = document.getElementById('saleAvailabilityHint');
+  if(!hint) return;
+  const itemId = document.getElementById('saleItemSelect').value;
+  const itemObj = items.find(i=>i.id===itemId);
+  if(!itemObj){ hint.textContent=''; return; }
+
+  const colorField = document.getElementById('saleColorField');
+  const colorSel = document.getElementById('saleColorSelect');
+  const color = (colorField.style.display !== 'none' && colorSel) ? colorSel.value : '';
+
+  const available = (hasColorStock(itemObj) && color)
+    ? remainingQtyForColor(itemObj, color)
+    : remainingQtyFor(itemObj);
+
+  const qty = Number(document.getElementById('saleQty').value)||0;
+  const over = qty > available;
+  hint.style.color = over ? 'var(--red)' : 'var(--muted)';
+  hint.textContent = `المتاح بالمخزن${color?' (لون '+color+')':''}: ${fmt(available)}` + (over ? ' — الكمية المطلوبة أكبر من المتاح' : '');
 }
 
 function resetSaleForm(){
@@ -2330,6 +2358,7 @@ function resetSaleForm(){
   document.getElementById('salePrice').value = '';
   document.getElementById('saleSku').value = '';
   document.getElementById('saleColorField').style.display = 'none';
+  updateSaleAvailabilityHint();
 }
 
 function saveSaleEntry(){
@@ -2351,6 +2380,18 @@ function saveSaleEntry(){
 
   const merchantProfile = merchantProfiles.find(p=>p.id===merchantId);
   const itemObj = items.find(i=>i.id===itemId);
+  if(!itemObj){ showToast('تعذر إيجاد الصنف المحدد'); return; }
+
+  const availableQty = (hasColorStock(itemObj) && color)
+    ? remainingQtyForColor(itemObj, color)
+    : remainingQtyFor(itemObj);
+
+  if(qty > availableQty){
+    showToast(availableQty <= 0
+      ? `الصنف "${itemObj.name}"${color?' بلون '+color:''} غير متوفر بالمخزن حاليًا`
+      : `الكمية المطلوبة أكبر من المتاح بالمخزن — المتاح: ${fmt(availableQty)} فقط`);
+    return;
+  }
 
   const payload = {
     date: dateVal,
@@ -2778,8 +2819,9 @@ function renderDailySales(){
     const thumbCell = img
       ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
       : `<div class="ds-thumb">📦</div>`;
+    const safeItemName = JSON.stringify(r.itemName||'').replace(/'/g, "&apos;");
     const deleteCell = r.source==='sale'
-      ? `<button class="btn btn-danger btn-sm edit-action" onclick="deleteSaleEntry('${r.id}','${r.itemId}',${JSON.stringify(r.itemName)},${r.qty},'${r.date}')">🗑</button>`
+      ? `<button class="btn btn-danger btn-sm edit-action" onclick='deleteSaleEntry("${r.id}","${r.itemId}",${safeItemName},${r.qty},"${r.date}")'>🗑</button>`
       : '';
     return `
     <tr>
