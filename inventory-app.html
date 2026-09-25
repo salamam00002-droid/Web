@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
   :root{
     color-scheme:light;
@@ -645,6 +646,31 @@
     body.printing-dailysales main{max-width:100%; margin:0; padding:0;}
     body.printing-dailysales .view:not(#view-dailysales){display:none !important;}
     body.printing-dailysales #view-dailysales > *:not(#dailySalesPrintArea){display:none !important;}
+
+    /* ---- تنسيق جدول المبيعات اليومية عند الطباعة ليكون واضح وسهل القراءة ---- */
+    #dailySalesPrintArea{color:#000;}
+    #dailySalesPrintArea .card{box-shadow:none !important; border:none !important; padding:0 !important; overflow:visible !important;}
+    #dailySalesPrintArea table{
+      width:100% !important; border-collapse:collapse !important; table-layout:fixed;
+      page-break-inside:auto;
+    }
+    #dailySalesPrintArea th, #dailySalesPrintArea td{
+      border:1px solid #000 !important; padding:6px 8px !important;
+      text-align:center !important; vertical-align:middle; font-size:12px !important;
+      word-break:break-word;
+    }
+    #dailySalesPrintArea thead{display:table-header-group;}
+    #dailySalesPrintArea thead th{
+      background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+      font-weight:800 !important;
+    }
+    #dailySalesPrintArea tr{page-break-inside:avoid; page-break-after:auto;}
+    /* إخفاء عمودي الصورة وزر الحذف، مش مفيدين في الطباعة */
+    #dailySalesPrintArea th:nth-last-child(-n+2),
+    #dailySalesPrintArea td:nth-last-child(-n+2){display:none !important;}
+    #dailySalesPrintArea .section-head{page-break-after:avoid; margin:16px 0 6px !important;}
+    #dailySalesPrintArea .section-head h2{font-size:13px !important; color:#000 !important;}
+    #dailySalesPrintArea .section-head .page-sub{font-size:11px !important; color:#000 !important;}
   }
 </style>
 </head>
@@ -839,7 +865,7 @@
         <div class="page-sub">تسجيل مبيعات جديدة وعرض سجل المبيعات</div>
       </div>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="exportDailySalesCsv()">⬇️ تصدير CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="exportDailySalesXlsx()">⬇️ تصدير Excel</button>
         <button class="btn btn-gold btn-sm" onclick="printDailySales()">🖨️ طباعة</button>
       </div>
     </div>
@@ -3131,6 +3157,91 @@ function exportDailySalesCsv(){
     rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName||'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.price, (Number(r.qty)||0)*(Number(r.price)||0)]);
   });
   downloadCsv('المبيعات اليومية.csv', rows);
+}
+
+async function exportDailySalesXlsx(){
+  if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
+  const s = currentDailySalesExport;
+  const rows = [['المبيعات اليومية']];
+  rows.push([s.titleText||'']);
+  rows.push([]);
+  rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية','السعر','الإجمالي']);
+  s.rows.forEach(r=>{
+    rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName||'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.price, (Number(r.qty)||0)*(Number(r.price)||0)]);
+  });
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('المبيعات اليومية');
+  ws.views = [{ rightToLeft: true }];
+  rows.forEach(r=> ws.addRow(r));
+
+  const colCount = Math.max(...rows.map(r=>r.length));
+  const headerRowNum = 4;
+  /* دمج صفي العنوان والفترة عبر كل الأعمدة حتى لا يحسبا ضمن عرض عمود التاريخ */
+  ws.mergeCells(1,1,1,colCount);
+  ws.mergeCells(2,1,2,colCount);
+  ws.getCell(1,1).font = { bold:true, size:13 };
+  ws.getCell(2,1).font = { size:11 };
+
+  /* عرض الأعمدة يُحسب من صف العناوين وصفوف البيانات فقط، بدون صفي العنوان المدموجين */
+  const widthRows = rows.slice(headerRowNum-1);
+  for(let i=1; i<=colCount; i++){
+    let maxLen = 8;
+    widthRows.forEach(r=>{
+      const v = r[i-1];
+      const len = (v===null||v===undefined) ? 0 : String(v).length;
+      if(len>maxLen) maxLen = len;
+    });
+    ws.getColumn(i).width = Math.min(30, maxLen+2);
+  }
+
+  /* إعداد الصفحة للطباعة بورتريه مع احتواء كل الأعمدة في عرض الصفحة */
+  ws.pageSetup = {
+    orientation: 'portrait',
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true,
+    margins: { left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.2, footer:0.2 }
+  };
+
+  ws.eachRow(row=>{
+    row.eachCell({includeEmpty:true}, cell=>{
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+  });
+
+  /* حدود واضحة حوالين كل خلايا الجدول (من صف العناوين لآخر صف بيانات) */
+  const thinBorder = { style:'thin', color:{argb:'FF000000'} };
+  for(let r = headerRowNum; r <= ws.rowCount; r++){
+    ws.getRow(r).eachCell({includeEmpty:true}, cell=>{
+      cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
+    });
+  }
+  /* تظليل وتغميق صف العناوين */
+  ws.getRow(headerRowNum).eachCell({includeEmpty:true}, cell=>{
+    cell.font = { bold:true };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8E8E8'} };
+  });
+
+  /* تظليل خفيف بالتبادل لصفوف البيانات (سطر مظلل وسطر لأ) لسهولة القراءة */
+  let stripeIndex = 0;
+  for(let r = headerRowNum+1; r <= ws.rowCount; r++){
+    if(stripeIndex % 2 === 0){
+      ws.getRow(r).eachCell({includeEmpty:true}, cell=>{
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} };
+      });
+    }
+    stripeIndex++;
+  }
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'المبيعات اليومية.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* يحوّل رقم تليفون مصري محلي (01xxxxxxxxx) لصيغة دولية لواتساب (20xxxxxxxxx) */
