@@ -785,6 +785,32 @@ function selectColor(el, itemId, color){
   el.classList.add('selected');
   // store selected color temporarily on the card
   document.getElementById('card_'+itemId).dataset.selectedColor = color;
+  updateCardImage(itemId, color);
+}
+
+/* تغيير الصورة الأساسية للصنف فى الكارت لصورة اللون المختار،
+   ولو مفيش صورة مسجلة لهذا اللون يترجع لصورة الصنف الافتراضية */
+function updateCardImage(itemId, color){
+  const item = allItems.find(i=>i.id===itemId);
+  if(!item) return;
+  const wrap = document.querySelector(`#card_${itemId} .product-img`);
+  if(!wrap) return;
+  const colorImg = color && item.colorImages && item.colorImages[color];
+  const src = colorImg || item.image || '';
+  const badge = wrap.querySelector('.in-cart-badge');
+  let imgEl = wrap.querySelector('img');
+  if(src){
+    if(imgEl){
+      imgEl.src = src;
+      imgEl.alt = esc(item.name);
+    }else{
+      wrap.innerHTML = `<img src="${esc(src)}" alt="${esc(item.name)}" loading="lazy">`;
+      if(badge) wrap.appendChild(badge);
+    }
+  }else{
+    wrap.innerHTML = `<span class="no-img">📦</span>`;
+    if(badge) wrap.appendChild(badge);
+  }
 }
 
 /* ═══════════════════════════════════════
