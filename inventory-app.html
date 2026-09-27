@@ -345,10 +345,13 @@
   .ds-calendar-day.ds-selected .ds-dot{background:#fff;}
   .link-btn{background:none; border:none; color:var(--gold-dark); font-weight:700; font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;}
   .category-chip{display:inline-block; background:var(--cream); border:1px solid var(--line); color:var(--muted); font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; margin-inline-end:6px;}
-  .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
+  .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 6px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
   .color-qty-chip input{width:56px; padding:3px 6px; font-size:12px; border-radius:14px; text-align:center;}
   .color-qty-chip .cq-x{cursor:pointer; font-weight:800; color:var(--muted); padding:0 2px;}
   .color-qty-chip .cq-x:hover{color:var(--red);}
+  .color-chip-thumb{position:relative; width:26px; height:26px; border-radius:50%; flex:none; background-size:cover; background-position:center; background-color:var(--paper); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer; overflow:visible;}
+  .color-chip-thumb .cq-img-x{position:absolute; top:-5px; left:-5px; width:15px; height:15px; border-radius:50%; background:var(--red); color:#fff; font-size:9px; line-height:15px; text-align:center; cursor:pointer;}
+  .color-mini-thumb{width:20px; height:20px; border-radius:50%; background-size:cover; background-position:center; border:1px solid var(--line); flex:none; cursor:pointer; display:inline-block; vertical-align:middle;}
   .color-stock-mini{margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);}
   .color-remain-chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);}
   .color-remain-chip{
@@ -395,10 +398,23 @@
   .img-upload-actions{display:flex; flex-direction:column; gap:6px;}
   .item-card .thumb{
     width:100%; height:120px; border-radius:10px; overflow:hidden; margin-bottom:10px;
-    background:var(--cream); cursor:zoom-in; border:1px solid var(--line);
+    background:var(--cream); cursor:zoom-in; border:1px solid var(--line); position:relative;
   }
   .item-card .thumb img{width:100%; height:100%; object-fit:cover; display:block; transition:.15s;}
   .item-card .thumb:hover img{opacity:.88;}
+  .thumb-gallery-btn{
+    position:absolute; top:6px; inset-inline-start:6px; background:rgba(15,20,35,.72); color:#fff;
+    border:none; border-radius:20px; padding:4px 9px; font-size:13px; cursor:pointer;
+    display:flex; align-items:center; gap:4px; line-height:1;
+  }
+  .thumb-gallery-btn:hover{background:rgba(15,20,35,.9);}
+  .thumb-gallery-btn .tg-count{font-size:11px; font-weight:700;}
+  .item-gallery-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px;}
+  .item-gallery-cell{border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:zoom-in; background:var(--cream);}
+  .item-gallery-cell img{width:100%; height:96px; object-fit:cover; display:block;}
+  .item-gallery-caption{font-size:11px; text-align:center; padding:4px 2px; color:var(--muted); background:var(--paper);}
+  .img-source-modal .modal{max-width:320px;}
+  .img-source-modal .modal-body{display:flex; flex-direction:column; gap:10px;}
   .ds-thumb{
     width:40px; height:40px; border-radius:8px; overflow:hidden; flex-shrink:0;
     background:var(--cream); border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
@@ -1058,7 +1074,9 @@
         <div class="img-upload-row">
           <div class="img-preview" id="itemImagePreview" onclick="if(document.getElementById('itemImageData').value) openLightbox(document.getElementById('itemImageData').value, document.getElementById('itemName').value)">لا توجد صورة</div>
           <div class="img-upload-actions">
-            <input type="file" id="itemImageFile" accept="image/*" onchange="handleItemImageChange(event)">
+            <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleItemImageChange(event)">
+            <input type="file" id="itemImageCameraFile" accept="image/*" capture="environment" style="display:none;" onchange="handleItemImageChange(event)">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openImageSourceChooser('item')">📷 إضافة / تغيير صورة</button>
             <button type="button" class="btn btn-outline btn-sm" id="removeItemImageBtn" style="display:none;" onclick="removeItemImage()">إزالة الصورة</button>
           </div>
         </div>
@@ -1085,6 +1103,9 @@
             <button type="button" class="btn btn-outline btn-sm" onclick="addItemColorChip()">+ إضافة لون</button>
           </div>
           <div id="itemColorsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+          <input type="file" id="itemColorImageFile" accept="image/*" style="display:none;" onchange="handleColorImageChange(event)">
+          <input type="file" id="itemColorImageCameraFile" accept="image/*" capture="environment" style="display:none;" onchange="handleColorImageChange(event)">
+          <p class="helper" style="margin-top:6px;">اضغط على الدائرة بجانب اسم اللون لإضافة/تغيير صورة خاصة بهذا اللون (اختياري) — يمكنك الاختيار من الملفات أو التقاط صورة بالكاميرا مباشرة.</p>
           <p class="helper" style="margin-top:6px;">هذا الحقل يعرض دائماً العدد الفعلي المتبقي بالمخزن الآن (بعد خصم المصروف للتجار)، ويُحسب تلقائياً من مجموع كميات الألوان المتبقية عند إضافة لون بكمية.</p>
         </div>
         <div class="field">
@@ -1113,6 +1134,33 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="saveItem()">حفظ</button>
       <button class="btn btn-outline" onclick="closeModal('itemModalOverlay')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== IMAGE SOURCE CHOOSER MODAL ===== -->
+<div class="overlay img-source-modal" id="imgSourceModalOverlay" style="z-index:150;">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>اختر مصدر الصورة</h3>
+      <button class="icon-btn" onclick="closeModal('imgSourceModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <button type="button" class="btn btn-outline" onclick="pickImageSource('gallery')">📁 اختيار من الملفات</button>
+      <button type="button" class="btn btn-outline" onclick="pickImageSource('camera')">📷 التقاط صورة بالكاميرا</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ITEM IMAGES GALLERY MODAL ===== -->
+<div class="overlay" id="itemGalleryModalOverlay" style="z-index:150;">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="itemGalleryModalTitle">صور الصنف</h3>
+      <button class="icon-btn" onclick="closeModal('itemGalleryModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="itemGalleryGrid" class="item-gallery-grid"></div>
     </div>
   </div>
 </div>
@@ -1279,7 +1327,8 @@ applyDarkMode(localStorage.getItem('invapp_dark_mode') === '1');
 /* ===================== STATE ===================== */
 let db = null;
 let items = [];      // {id, name, color, colors, colorStock:{colorName:qty}, piecesCount, price, stockQty, alertThreshold}
-let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف، كل عنصر {name, qty}
+let itemColorsList = []; // الألوان المؤقتة أثناء تحرير/إضافة صنف فى نافذة الصنف، كل عنصر {name, qty, image}
+let pendingColorImageIdx = -1; // انديكس اللون اللى بنرفعله صورة دلوقتى
 let itemColorsManaged = false; // true إذا كان المستخدم بدأ يُدخل كمية لكل لون، فتُحسب الكمية الإجمالية تلقائياً
 let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId,itemName,color,qty,unitPrice,discount,subtotal}], total, payments:[{date,amount,note}], paid, remaining, notes}
 let merchantProfiles = []; // {id, name, phone, address, notes, createdAt}
@@ -1524,7 +1573,8 @@ function openItemModal(item){
   /* نعرض العدد الفعلي المتبقي بالمخزن الآن (بعد خصم المصروف) وليس الرصيد الأصلي وقت الإضافة */
   itemColorsList = colorNames.map(c=> {
     const hasQty = item && item.colorStock && item.colorStock[c]!==undefined;
-    return {name: c, qty: hasQty ? remainingQtyForColor(item, c) : 0};
+    const image = (item && item.colorImages && item.colorImages[c]) || '';
+    return {name: c, qty: hasQty ? remainingQtyForColor(item, c) : 0, image};
   });
   document.getElementById('itemColorInput').value = '';
   document.getElementById('itemColorQtyInput').value = '';
@@ -1560,6 +1610,9 @@ function renderItemColorsChips(){
   if(!box) return;
   box.innerHTML = itemColorsList.length ? itemColorsList.map((c,idx)=>`
     <span class="color-qty-chip">
+      <span class="color-chip-thumb" style="${c.image ? `background-image:url('${c.image}')` : `background:${colorToHex(c.name)}`}" onclick="triggerColorImagePick(${idx})" title="إضافة/تغيير صورة اللون">
+        ${c.image ? `<span class="cq-img-x" onclick="event.stopPropagation(); removeColorImage(${idx})" title="إزالة صورة اللون">✕</span>` : '📷'}
+      </span>
       ${escapeHtml(c.name)}
       <input type="number" min="0" value="${c.qty||0}" oninput="updateItemColorQty(${idx}, this.value)" onclick="event.stopPropagation()">
       <span class="cq-x" onclick="removeItemColorChip(${idx})">✕</span>
@@ -1574,7 +1627,7 @@ function addItemColorChip(){
   const qtyRaw = qtyInput.value;
   const qty = qtyRaw==='' ? 0 : (Number(qtyRaw)||0);
   if(qtyRaw!=='') itemColorsManaged = true;
-  if(!itemColorsList.some(c=> c.name.toLowerCase()===val.toLowerCase())) itemColorsList.push({name: val, qty});
+  if(!itemColorsList.some(c=> c.name.toLowerCase()===val.toLowerCase())) itemColorsList.push({name: val, qty, image:''});
   input.value = '';
   qtyInput.value = '';
   renderItemColorsChips();
@@ -1582,6 +1635,8 @@ function addItemColorChip(){
   input.focus();
 }
 function removeItemColorChip(idx){
+  const c = itemColorsList[idx];
+  if(c && c.image) deleteStorageImageSilently(c.image);
   itemColorsList.splice(idx,1);
   renderItemColorsChips();
   syncItemStockFromColors();
@@ -1693,11 +1748,126 @@ function uploadItemImageBlob(blob){
     showToast('فشل رفع الصورة: ' + e.message);
   });
 }
+/* ===================== PER-COLOR IMAGES (chip thumbnails) ===================== */
+function triggerColorImagePick(idx){
+  pendingColorImageIdx = idx;
+  openImageSourceChooser('color');
+}
+
+/* ===================== IMAGE SOURCE CHOOSER (ملفات / كاميرا) ===================== */
+let pendingImageTarget = null; // 'item' أو 'color'
+function openImageSourceChooser(target){
+  pendingImageTarget = target;
+  document.getElementById('imgSourceModalOverlay').classList.add('active');
+}
+function pickImageSource(mode){
+  closeModal('imgSourceModalOverlay');
+  const target = pendingImageTarget;
+  if(target === 'item'){
+    const inputId = mode === 'camera' ? 'itemImageCameraFile' : 'itemImageFile';
+    const input = document.getElementById(inputId);
+    input.value = '';
+    input.click();
+  }else if(target === 'color'){
+    const inputId = mode === 'camera' ? 'itemColorImageCameraFile' : 'itemColorImageFile';
+    const input = document.getElementById(inputId);
+    input.value = '';
+    input.click();
+  }
+}
+function handleColorImageChange(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file || pendingColorImageIdx < 0) return;
+  if(!file.type.startsWith('image/')){ showToast('من فضلك اختر ملف صورة'); return; }
+  const idx = pendingColorImageIdx;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxDim = 700;
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        if(w >= h){ h = Math.round(h * (maxDim/w)); w = maxDim; }
+        else{ w = Math.round(w * (maxDim/h)); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob){
+        if(!blob){ showToast('تعذّرت معالجة الصورة'); return; }
+        uploadColorImageBlob(idx, blob);
+      }, 'image/jpeg', 0.75);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function uploadColorImageBlob(idx, blob){
+  if(!storage){ showToast('Firebase Storage غير متاح'); return; }
+  if(!itemColorsList[idx]) return;
+  const oldUrl = itemColorsList[idx].image;
+  const path = 'items/colors/' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.jpg';
+  const ref = storage.ref().child(path);
+  ref.put(blob, {contentType:'image/jpeg'}).then(function(snap){
+    return snap.ref.getDownloadURL();
+  }).then(function(url){
+    if(!itemColorsList[idx]) return; /* ممكن يكون اتشال لحد ما الرفع خلص */
+    itemColorsList[idx].image = url;
+    deleteStorageImageSilently(oldUrl);
+    renderItemColorsChips();
+  }).catch(function(e){
+    showToast('فشل رفع صورة اللون: ' + e.message);
+  });
+}
+function removeColorImage(idx){
+  if(!itemColorsList[idx]) return;
+  const oldUrl = itemColorsList[idx].image;
+  itemColorsList[idx].image = '';
+  deleteStorageImageSilently(oldUrl);
+  renderItemColorsChips();
+}
 function openLightbox(src, caption){
   if(!src) return;
   document.getElementById('lightboxImg').src = src;
   document.getElementById('lightboxCaption').textContent = caption || '';
   document.getElementById('lightboxOverlay').classList.add('active');
+}
+
+/* ===================== كل صور الصنف (الصورة الرئيسية + صور الألوان) ===================== */
+function itemImagesList(item){
+  const list = [];
+  if(item && item.image) list.push({src:item.image, caption:'الصورة الرئيسية'});
+  if(item && item.colorImages){
+    Object.keys(item.colorImages).forEach(c=>{
+      if(item.colorImages[c]) list.push({src:item.colorImages[c], caption:c});
+    });
+  }
+  return list;
+}
+function itemThumbBlockHtml(item){
+  const imgs = itemImagesList(item);
+  if(imgs.length===0) return '';
+  const mainSrc = imgs[0].src;
+  const itemJson = JSON.stringify(item).replace(/'/g,"&apos;");
+  return `<div class="thumb" onclick='openLightbox(${JSON.stringify(mainSrc)}, ${JSON.stringify(item.name)})'>
+    <img src="${mainSrc}" alt="${escapeHtml(item.name)}">
+    <button type="button" class="thumb-gallery-btn" title="عرض كل صور الصنف" onclick='event.stopPropagation(); openItemGallery(${itemJson})'>🖼️${imgs.length>1 ? ` <span class="tg-count">${imgs.length}</span>` : ''}</button>
+  </div>`;
+}
+function openItemGallery(item){
+  const imgs = itemImagesList(item);
+  document.getElementById('itemGalleryModalTitle').textContent = 'صور الصنف: ' + (item.name||'');
+  const grid = document.getElementById('itemGalleryGrid');
+  if(imgs.length===0){
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="big">🖼️</div>لا توجد صور لهذا الصنف بعد.</div>`;
+  }else{
+    grid.innerHTML = imgs.map(im=>`
+      <div class="item-gallery-cell" onclick='openLightbox(${JSON.stringify(im.src)}, ${JSON.stringify((item.name||"")+" - "+im.caption)})'>
+        <img src="${im.src}" alt="${escapeHtml(im.caption)}">
+        <div class="item-gallery-caption">${escapeHtml(im.caption)}</div>
+      </div>`).join('');
+  }
+  document.getElementById('itemGalleryModalOverlay').classList.add('active');
 }
 function closeLightbox(e){
   if(e) e.stopPropagation();
@@ -1712,6 +1882,8 @@ function saveItem(){
   const sku = document.getElementById('itemSku').value.trim();
   const colors = itemColorsList.map(c=> c.name);
   const color = colors.join('، ');
+  const colorImages = {};
+  itemColorsList.forEach(c=>{ if(c.image) colorImages[c.name] = c.image; });
   const piecesCount = Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
   const usingColorStock = itemColorsList.length>0 && itemColorsManaged;
@@ -1775,6 +1947,8 @@ function saveItem(){
     const payload = { name, category, sku, color, colors, piecesCount, price, stockQty: newStockQty, alertThreshold: null, image: document.getElementById('itemImageData').value || '' };
     if(usingColorStock) payload.colorStock = colorStock;
     else if(id) payload.colorStock = firebase.firestore.FieldValue.delete();
+    if(Object.keys(colorImages).length) payload.colorImages = colorImages;
+    else payload.colorImages = firebase.firestore.FieldValue.delete();
 
     db.collection('items').doc(id).update(payload)
       .then(()=>{
@@ -1796,6 +1970,7 @@ function saveItem(){
     const image = document.getElementById('itemImageData').value || '';
     const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold: null, image };
     if(usingColorStock) payload.colorStock = colorStock;
+    if(Object.keys(colorImages).length) payload.colorImages = colorImages;
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('items').add(payload)
       .then((ref)=>{
@@ -1906,7 +2081,7 @@ function renderItems(){
     const isStagnant = remaining > 0 && stagnantDays >= 30 && stagnantDays !== Infinity;
     return `
     <div class="item-card">
-      ${item.image ? `<div class="thumb" onclick='openLightbox(${JSON.stringify(item.image)}, ${JSON.stringify(item.name)})'><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>` : ''}
+      ${itemThumbBlockHtml(item)}
       <span class="badge">${item.piecesCount} قطع/طقم</span>
       ${item.category ? `<span class="category-chip">${escapeHtml(item.category)}</span>` : ''}
       <h3>${escapeHtml(item.name)}</h3>
@@ -2123,7 +2298,7 @@ function renderRemainingStock(){
     const lowStock = remaining <= getAlertThreshold(item);
     return `
     <div class="item-card">
-      ${item.image ? `<div class="thumb" onclick='openLightbox(${JSON.stringify(item.image)}, ${JSON.stringify(item.name)})'><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>` : ''}
+      ${itemThumbBlockHtml(item)}
       <span class="badge">${item.piecesCount} قطع/طقم</span>
       <div class="item-name-label">اسم الصنف</div>
       <h3 class="item-name-big">${escapeHtml(item.name)}</h3>
@@ -2135,7 +2310,11 @@ function renderRemainingStock(){
       <div class="color-stock-mini">
         ${Object.keys(item.colorStock).map(c=>{
           const remC = remainingQtyForColor(item, c);
-          return `<div class="row"><span><span class="swatch" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}</span><span style="${remC<=0?'color:var(--red);':''}">${fmt(remC)} متبقي</span></div>`;
+          const cImg = item.colorImages && item.colorImages[c];
+          const swatchEl = cImg
+            ? `<span class="color-mini-thumb" style="background-image:url('${cImg}')" onclick='openLightbox(${JSON.stringify(cImg)}, ${JSON.stringify(item.name+" - "+c)})'></span>`
+            : `<span class="swatch" style="background:${colorToHex(c)}"></span>`;
+          return `<div class="row"><span>${swatchEl}${escapeHtml(c)}</span><span style="${remC<=0?'color:var(--red);':''}">${fmt(remC)} متبقي</span></div>`;
         }).join('')}
       </div>` : ''}
     </div>`;
