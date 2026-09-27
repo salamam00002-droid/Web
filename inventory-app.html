@@ -632,6 +632,34 @@
     .ds-calendar{max-width:165px;}
   }
 
+  /* ========== ORDERS STYLES ========== */
+  .order-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px;
+  }
+  .order-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .order-card-head h3{font-size:15px;font-weight:800;color:var(--ink);}
+  .order-card-head .order-meta{font-size:12px;color:var(--muted);margin-top:3px;}
+  .order-items-table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+  .order-items-table th{text-align:right;color:var(--muted);font-size:11px;font-weight:700;padding:5px 8px;border-bottom:2px solid var(--line);}
+  .order-items-table td{padding:8px;border-bottom:1px dashed var(--line);}
+  .order-items-table td.money{font-weight:800;font-family:'Cairo',sans-serif;}
+  .order-total-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:800;padding:10px 0 4px;border-top:2px solid var(--line);margin-top:6px;}
+  .order-total-val{font-size:20px;font-weight:800;font-family:'Cairo',sans-serif;color:var(--ink);}
+  .order-note{background:var(--cream);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--muted);margin-top:8px;}
+  .order-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .status-badge{padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:800;white-space:nowrap;}
+  .status-badge.pending{background:#FDF2E3;color:#A87F2C;}
+  .status-badge.confirmed{background:#E5F3EA;color:#3E7A52;}
+  .status-badge.done{background:#E5F3EA;color:#3E7A52;opacity:.7;}
+  .status-badge.cancelled{background:#FBEDEA;color:#B4432F;}
+  html.dark-mode .status-badge.pending{background:#3A2E10;color:#E8C46A;}
+  html.dark-mode .status-badge.confirmed{background:#1A3028;color:#6BC48C;}
+  html.dark-mode .status-badge.cancelled{background:#3A2620;color:#E17E6B;}
+  .orders-empty{text-align:center;padding:60px 20px;color:var(--muted);}
+  .orders-empty .big{font-size:48px;margin-bottom:12px;}
+  /* ========== END ORDERS STYLES ========== */
+
   @media print{
     body.printing-statement > *:not(#statementModalOverlay){display:none !important;}
     body.printing-statement{padding:0; background:#fff;}
@@ -697,6 +725,7 @@
   <button data-view="remaining">المخزون المتبقي</button>
   <button data-view="movements">سجل الحركة</button>
   <button data-view="merchants">التجار</button>
+  <button data-view="orders">📋 الطلبات <span id="ordersNavBadge" style="display:none;background:#B4432F;color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;margin-right:4px;"></span></button>
 </nav>
 
 <main>
@@ -974,6 +1003,26 @@
     </div>
 
     <div id="merchantsCards"></div>
+  </div>
+
+  <!-- ========== ORDERS VIEW ========== -->
+  <div id="view-orders" class="view">
+    <div class="section-head" style="margin-top:0;">
+      <div>
+        <div class="page-title">📋 طلبات التجار</div>
+        <div class="page-sub">الطلبات الواردة من بوابة طلبات التجار</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <select id="ordersStatusFilter" class="btn btn-outline btn-sm" onchange="renderOrders()" style="padding:6px 12px;font-size:12.5px;border-radius:8px;">
+          <option value="">كل الطلبات</option>
+          <option value="pending">جديد / قيد الانتظار</option>
+          <option value="confirmed">مؤكد</option>
+          <option value="done">تم التسليم</option>
+          <option value="cancelled">ملغي</option>
+        </select>
+      </div>
+    </div>
+    <div id="ordersContainer"></div>
   </div>
 
   <!-- ========== ARCHIVED (COMPLETED) TRANSACTIONS VIEW ==========
@@ -1286,6 +1335,7 @@ function initFirebaseWithConfig(config){
       listenToStockMovements();
       listenToMerchantProfiles();
       listenToSaleEntries();
+      listenToOrders();
     });
   }catch(e){
     document.getElementById('view-loading').classList.remove('active');
@@ -1341,6 +1391,7 @@ function switchView(name){
   }
   if(name==='merchants') renderMerchants();
   if(name==='archived') renderArchived();
+  if(name==='orders') renderOrders();
 }
 
 /* ===================== TOAST ===================== */
@@ -3336,6 +3387,177 @@ function renderDashboard(){
       <div class="m-row"><span>الكمية</span><span>${fmt(r.qty)}</span></div>
       <div class="m-row"><span>الإجمالي</span><span>${fmt((Number(r.qty)||0)*(Number(r.price)||0))}</span></div>
     </div>`).join('') : `<div class="card"><div class="empty">لا توجد مبيعات بعد.</div></div>`;
+}
+
+/* ===================== ORDERS ===================== */
+let orders = [];
+
+function listenToOrders(){
+  db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap=>{
+    orders = [];
+    snap.forEach(doc=> orders.push({id: doc.id, ...doc.data()}));
+    renderOrders();
+    updateOrdersBadge();
+  }, err=>{ console.warn('orders:', err.message); });
+}
+
+function updateOrdersBadge(){
+  const pending = orders.filter(o=> o.status === 'pending').length;
+  const badge = document.getElementById('ordersNavBadge');
+  if(!badge) return;
+  if(pending > 0){
+    badge.textContent = pending;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function renderOrders(){
+  const container = document.getElementById('ordersContainer');
+  if(!container) return;
+  const filter = document.getElementById('ordersStatusFilter')?.value || '';
+  let list = filter ? orders.filter(o=> o.status === filter) : orders;
+
+  if(!list.length){
+    container.innerHTML = `<div class="orders-empty"><div class="big">📋</div><p>${filter ? 'لا توجد طلبات بهذه الحالة' : 'لا توجد طلبات بعد — ستظهر هنا طلبات التجار من بوابة الطلبات'}</p></div>`;
+    return;
+  }
+
+  const statusLabel = {pending:'⏳ جديد / قيد الانتظار', confirmed:'✅ مؤكد', done:'📦 تم التسليم', cancelled:'❌ ملغي'};
+
+  container.innerHTML = list.map(order=>{
+    const date = order.createdAt?.toDate ? fmtDate(order.createdAt.toDate().toISOString().slice(0,10)) : '—';
+    const time = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '';
+    const itemsRows = (order.items||[]).map(it=>`
+      <tr>
+        <td>${escapeHtml(it.itemName||'—')}</td>
+        <td>${escapeHtml(it.color||'—')}</td>
+        <td>${escapeHtml(it.sku||'—')}</td>
+        <td>${fmt(it.qty)}</td>
+        <td class="money">${fmt(it.price)}</td>
+        <td class="money">${fmt(it.subtotal||((it.qty||0)*(it.price||0)))}</td>
+      </tr>`).join('');
+
+    const whatsapp = order.merchantPhone ? (() => {
+      let d = (order.merchantPhone||'').replace(/[^\d]/g,'');
+      if(d.startsWith('0')) d = '20'+d.slice(1);
+      const lines = (order.items||[]).map(it=>`• ${it.itemName}${it.color?' ('+it.color+')':''} × ${it.qty} = ${fmt((it.qty||0)*(it.price||0))} جنيه`).join('\n');
+      const msg = encodeURIComponent(`طلب جديد من: ${order.merchantName||'—'}\n${lines}\nالإجمالي: ${fmt(order.total)} جنيه${order.note?'\nملاحظات: '+order.note:''}`);
+      return `https://wa.me/${d}?text=${msg}`;
+    })() : null;
+
+    return `
+    <div class="order-card" id="orderCard_${order.id}">
+      <div class="order-card-head">
+        <div>
+          <h3>🏪 ${escapeHtml(order.merchantName||'—')}</h3>
+          <div class="order-meta">
+            ${order.merchantPhone ? `📞 ${escapeHtml(order.merchantPhone)} · ` : ''}
+            🗓️ ${date} ${time}
+            · ${(order.items||[]).reduce((s,i)=>s+(Number(i.qty)||0),0)} قطعة
+          </div>
+        </div>
+        <span class="status-badge ${order.status||'pending'}">${statusLabel[order.status||'pending']||order.status}</span>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="order-items-table">
+          <thead><tr><th>الصنف</th><th>اللون</th><th>الكود</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+          <tbody>${itemsRows}</tbody>
+        </table>
+      </div>
+      <div class="order-total-row">
+        <span>الإجمالي الكلي</span>
+        <span class="order-total-val">${fmt(order.total)} جنيه</span>
+      </div>
+      ${order.note ? `<div class="order-note">💬 ملاحظات التاجر: ${escapeHtml(order.note)}</div>` : ''}
+
+      <div class="order-actions">
+        ${order.status==='pending' ? `
+          <button class="btn btn-gold btn-sm" onclick="updateOrderStatus('${order.id}','confirmed')">✅ تأكيد الطلب</button>
+          <button class="btn btn-outline btn-sm" onclick="convertOrderToSales('${order.id}')">💾 تحويل لمبيعات</button>
+        ` : ''}
+        ${order.status==='confirmed' ? `
+          <button class="btn btn-outline btn-sm" onclick="updateOrderStatus('${order.id}','done')">📦 تم التسليم</button>
+          <button class="btn btn-outline btn-sm" onclick="convertOrderToSales('${order.id}')">💾 تحويل لمبيعات</button>
+        ` : ''}
+        ${(order.status==='pending'||order.status==='confirmed') ? `
+          <button class="btn btn-danger btn-sm" onclick="updateOrderStatus('${order.id}','cancelled')">❌ إلغاء</button>
+        ` : ''}
+        ${whatsapp ? `<a href="${whatsapp}" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;">💬 واتساب</a>` : ''}
+        ${order.status==='cancelled'||order.status==='done' ? `
+          <button class="btn btn-danger btn-sm" onclick="deleteOrder('${order.id}')">🗑 حذف</button>
+        ` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateOrderStatus(orderId, newStatus){
+  const labels = {confirmed:'تأكيد الطلب؟', done:'تأكيد التسليم؟', cancelled:'إلغاء الطلب؟'};
+  if(!confirm(labels[newStatus]||'تأكيد؟')) return;
+  db.collection('orders').doc(orderId).update({status: newStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp()})
+    .then(()=> showToast('تم تحديث حالة الطلب'))
+    .catch(e=> showToast('خطأ: '+e.message));
+}
+
+function deleteOrder(orderId){
+  if(!confirm('حذف الطلب نهائياً؟')) return;
+  db.collection('orders').doc(orderId).delete()
+    .then(()=> showToast('تم حذف الطلب'))
+    .catch(e=> showToast('خطأ: '+e.message));
+}
+
+function convertOrderToSales(orderId){
+  const order = orders.find(o=>o.id===orderId);
+  if(!order){ showToast('الطلب غير موجود'); return; }
+  if(!confirm(`تحويل طلب "${order.merchantName}" (${(order.items||[]).length} أصناف) إلى مبيعات؟\nسيُضاف كل صنف في الطلب كعملية بيع منفصلة في المبيعات اليومية.`)) return;
+
+  const today = new Date().toISOString().slice(0,10);
+  const batch = db.batch();
+
+  (order.items||[]).forEach(it=>{
+    const ref = db.collection('saleEntries').doc();
+    batch.set(ref, {
+      merchantName: order.merchantName||'',
+      merchantPhone: order.merchantPhone||'',
+      itemId: it.itemId||'',
+      itemName: it.itemName||'',
+      sku: it.sku||'',
+      color: it.color||'',
+      qty: Number(it.qty)||0,
+      price: Number(it.price)||0,
+      date: today,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sourceType: 'order',
+      sourceOrderId: orderId,
+    });
+    // log stock movement
+    if(it.itemId){
+      const movRef = db.collection('stockMovements').doc();
+      batch.set(movRef, {
+        itemId: it.itemId,
+        itemName: it.itemName||'',
+        type: 'out',
+        qty: Number(it.qty)||0,
+        date: today,
+        note: `طلب تاجر: ${order.merchantName||''}`,
+        sourceType: 'order',
+        sourceId: orderId,
+      });
+    }
+  });
+
+  // mark order as done
+  const orderRef = db.collection('orders').doc(orderId);
+  batch.update(orderRef, {status:'done', convertedAt: firebase.firestore.FieldValue.serverTimestamp()});
+
+  batch.commit()
+    .then(()=>{
+      showToast('✅ تم تحويل الطلب لمبيعات بنجاح');
+    })
+    .catch(e=> showToast('خطأ: '+e.message));
 }
 
 /* ===================== BOOT ===================== */
