@@ -3295,7 +3295,7 @@ function renderDailySales(){
     const dayTotalQty = group.items.reduce((s,r)=> s + (Number(r.qty)||0), 0);
     const rowsHtml = group.items.map(r=>{
       const item = items.find(i=> i.id===r.itemId);
-      const img = item && item.image;
+      const img = (item && item.colorImages && r.color && item.colorImages[r.color]) || (item && item.image) || '';
       const thumbCell = img
         ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
         : `<div class="ds-thumb">📦</div>`;
