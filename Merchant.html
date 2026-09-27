@@ -68,6 +68,18 @@ h1,h2,h3,h4,.brand{font-family:'Cairo',sans-serif;}
 .btn-primary:hover{background:var(--navy-2);}
 .setup-divider{border:none;border-top:1px solid var(--line);margin:20px 0;}
 
+/* ─── LOADING SCREEN ─── */
+#loadingScreen{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;background:var(--navy);color:#fff;
+}
+#loadingScreen .spinner{
+  width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.25);
+  border-top-color:#fff;animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loadingScreen p{font-size:14px;color:rgba(255,255,255,.85);}
+
 /* ─── MAIN APP ─── */
 #appScreen{display:none;}
 
@@ -370,6 +382,12 @@ header{
 </head>
 <body>
 
+<!-- LOADING SCREEN (default visible screen until Firebase connects) -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <p>جاري الاتصال بالمخزن...</p>
+</div>
+
 <!-- SETUP SCREEN -->
 <div id="setupScreen" style="display:none;">
   <div class="setup-card">
@@ -525,7 +543,7 @@ header{
 </div>
 
 <!-- SUCCESS -->
-<div id="successScreen" style="display:flex;">
+<div id="successScreen" style="display:none;">
   <div class="success-icon">✅</div>
   <h2>تم إرسال طلبك بنجاح!</h2>
   <p>سيتواصل معك المورد قريباً لتأكيد الطلب وترتيب التسليم.</p>
@@ -595,11 +613,16 @@ function connect(cfg){
 }
 
 function showError(msg){
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display     = 'none';
+  document.getElementById('successScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display   = 'flex';
   const el = document.getElementById('setupError');
   el.textContent = msg; el.style.display='block';
 }
 
 function startApp(){
+  document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('setupScreen').style.display = 'none';
   document.getElementById('appScreen').style.display   = 'block';
   document.getElementById('successScreen').style.display = 'none';
