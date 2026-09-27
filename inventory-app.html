@@ -413,8 +413,6 @@
   .item-gallery-cell{border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:zoom-in; background:var(--cream);}
   .item-gallery-cell img{width:100%; height:96px; object-fit:cover; display:block;}
   .item-gallery-caption{font-size:11px; text-align:center; padding:4px 2px; color:var(--muted); background:var(--paper);}
-  .img-source-modal .modal{max-width:320px;}
-  .img-source-modal .modal-body{display:flex; flex-direction:column; gap:10px;}
   .ds-thumb{
     width:40px; height:40px; border-radius:8px; overflow:hidden; flex-shrink:0;
     background:var(--cream); border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
@@ -1075,8 +1073,7 @@
           <div class="img-preview" id="itemImagePreview" onclick="if(document.getElementById('itemImageData').value) openLightbox(document.getElementById('itemImageData').value, document.getElementById('itemName').value)">لا توجد صورة</div>
           <div class="img-upload-actions">
             <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleItemImageChange(event)">
-            <input type="file" id="itemImageCameraFile" accept="image/*" capture="environment" style="display:none;" onchange="handleItemImageChange(event)">
-            <button type="button" class="btn btn-outline btn-sm" onclick="openImageSourceChooser('item')">📷 إضافة / تغيير صورة</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('itemImageFile').value=''; document.getElementById('itemImageFile').click();">📷 إضافة / تغيير صورة</button>
             <button type="button" class="btn btn-outline btn-sm" id="removeItemImageBtn" style="display:none;" onclick="removeItemImage()">إزالة الصورة</button>
           </div>
         </div>
@@ -1104,8 +1101,7 @@
           </div>
           <div id="itemColorsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
           <input type="file" id="itemColorImageFile" accept="image/*" style="display:none;" onchange="handleColorImageChange(event)">
-          <input type="file" id="itemColorImageCameraFile" accept="image/*" capture="environment" style="display:none;" onchange="handleColorImageChange(event)">
-          <p class="helper" style="margin-top:6px;">اضغط على الدائرة بجانب اسم اللون لإضافة/تغيير صورة خاصة بهذا اللون (اختياري) — يمكنك الاختيار من الملفات أو التقاط صورة بالكاميرا مباشرة.</p>
+          <p class="helper" style="margin-top:6px;">اضغط على الدائرة بجانب اسم اللون لإضافة/تغيير صورة خاصة بهذا اللون (اختياري).</p>
           <p class="helper" style="margin-top:6px;">هذا الحقل يعرض دائماً العدد الفعلي المتبقي بالمخزن الآن (بعد خصم المصروف للتجار)، ويُحسب تلقائياً من مجموع كميات الألوان المتبقية عند إضافة لون بكمية.</p>
         </div>
         <div class="field">
@@ -1134,20 +1130,6 @@
     <div class="modal-foot">
       <button class="btn btn-gold" onclick="saveItem()">حفظ</button>
       <button class="btn btn-outline" onclick="closeModal('itemModalOverlay')">إلغاء</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== IMAGE SOURCE CHOOSER MODAL ===== -->
-<div class="overlay img-source-modal" id="imgSourceModalOverlay" style="z-index:150;">
-  <div class="modal">
-    <div class="modal-head">
-      <h3>اختر مصدر الصورة</h3>
-      <button class="icon-btn" onclick="closeModal('imgSourceModalOverlay')">✕</button>
-    </div>
-    <div class="modal-body">
-      <button type="button" class="btn btn-outline" onclick="pickImageSource('gallery')">📁 اختيار من الملفات</button>
-      <button type="button" class="btn btn-outline" onclick="pickImageSource('camera')">📷 التقاط صورة بالكاميرا</button>
     </div>
   </div>
 </div>
@@ -1751,29 +1733,8 @@ function uploadItemImageBlob(blob){
 /* ===================== PER-COLOR IMAGES (chip thumbnails) ===================== */
 function triggerColorImagePick(idx){
   pendingColorImageIdx = idx;
-  openImageSourceChooser('color');
-}
-
-/* ===================== IMAGE SOURCE CHOOSER (ملفات / كاميرا) ===================== */
-let pendingImageTarget = null; // 'item' أو 'color'
-function openImageSourceChooser(target){
-  pendingImageTarget = target;
-  document.getElementById('imgSourceModalOverlay').classList.add('active');
-}
-function pickImageSource(mode){
-  closeModal('imgSourceModalOverlay');
-  const target = pendingImageTarget;
-  if(target === 'item'){
-    const inputId = mode === 'camera' ? 'itemImageCameraFile' : 'itemImageFile';
-    const input = document.getElementById(inputId);
-    input.value = '';
-    input.click();
-  }else if(target === 'color'){
-    const inputId = mode === 'camera' ? 'itemColorImageCameraFile' : 'itemColorImageFile';
-    const input = document.getElementById(inputId);
-    input.value = '';
-    input.click();
-  }
+  document.getElementById('itemColorImageFile').value = '';
+  document.getElementById('itemColorImageFile').click();
 }
 function handleColorImageChange(e){
   const file = e.target.files && e.target.files[0];
