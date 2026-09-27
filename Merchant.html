@@ -891,6 +891,27 @@ function closeDrawer(){
 }
 
 /* ═══════════════════════════════════════
+   AUTO-ADD MERCHANT TO merchantProfiles
+═══════════════════════════════════════ */
+function ensureMerchantProfile(name, phone){
+  const normPhone = (phone||'').replace(/[^0-9]/g,'');
+  const query = normPhone
+    ? db.collection('merchantProfiles').where('phone','==',normPhone).limit(1).get()
+    : db.collection('merchantProfiles').where('name','==',name).limit(1).get();
+
+  return query.then(snap=>{
+    if(!snap.empty) return; // التاجر موجود بالفعل، متعملش نسخة تانية
+    return db.collection('merchantProfiles').add({
+      name: name,
+      phone: normPhone,
+      address: '',
+      notes: 'تمت الإضافة تلقائيًا من بوابة الطلبات',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).catch(e=> console.warn('تعذر إنشاء/تحديث بيانات التاجر تلقائيًا:', e.message));
+}
+
+/* ═══════════════════════════════════════
    SUBMIT ORDER
 ═══════════════════════════════════════ */
 function submitOrder(fromDrawer){
@@ -931,6 +952,7 @@ function submitOrder(fromDrawer){
 
   db.collection('orders').add(order)
     .then(ref=>{
+      ensureMerchantProfile(name, phone);
       closeDrawer();
       document.getElementById('appScreen').style.display='none';
       document.getElementById('successScreen').style.display='flex';
