@@ -3170,6 +3170,13 @@ async function exportDailySalesXlsx(){
     rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName||'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.price, (Number(r.qty)||0)*(Number(r.price)||0)]);
   });
 
+  /* حساب إجمالي المبيعات */
+  const grandTotal = s.rows.reduce((sum, r) => sum + (Number(r.qty)||0)*(Number(r.price)||0), 0);
+  /* إضافة صف فارغ ثم صف الإجمالي */
+  rows.push([]);
+  const totalRowData = ['','','','','','','الإجمالي', grandTotal];
+  rows.push(totalRowData);
+
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('المبيعات اليومية');
   ws.views = [{ rightToLeft: true }];
@@ -3234,6 +3241,17 @@ async function exportDailySalesXlsx(){
     }
     stripeIndex++;
   }
+
+  /* تنسيق صف الإجمالي (آخر صف) */
+  const totalRowNum = ws.rowCount;
+  const totalRow = ws.getRow(totalRowNum);
+  totalRow.eachCell({includeEmpty:true}, cell => {
+    cell.font = { bold: true, size: 12 };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B2A4A'} };
+    cell.font = { bold: true, size: 12, color: {argb:'FFFFFFFF'} };
+    cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
