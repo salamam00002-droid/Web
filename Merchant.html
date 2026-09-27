@@ -101,12 +101,6 @@ header{
   background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
   border-radius:20px;padding:6px 14px;color:#E8D9B5;font-size:13px;font-weight:700;
 }
-#btnLogout{
-  background:none;border:1px solid rgba(255,255,255,.2);color:#9AABCC;
-  border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;
-  transition:.15s;font-family:'Tajawal',sans-serif;
-}
-#btnLogout:hover{background:rgba(255,255,255,.1);color:#fff;}
 #connDot{width:8px;height:8px;border-radius:50%;background:#888;flex-shrink:0;}
 #connDot.online{background:#4CD37B;}
 #connDot.offline{background:#E05A47;}
@@ -428,7 +422,6 @@ header{
       <div class="header-user">
         <div id="connDot"></div>
         <div class="user-pill" id="userPill">—</div>
-        <button id="btnLogout" onclick="logout()">خروج</button>
       </div>
     </div>
   </header>
@@ -635,11 +628,6 @@ function startApp(){
   if(phone) { document.getElementById('merchantPhone').value=phone; document.getElementById('merchantPhone2').value=phone; }
 
   listenData();
-}
-
-function logout(){
-  localStorage.removeItem('mpConfig');
-  location.reload();
 }
 
 /* ═══════════════════════════════════════
