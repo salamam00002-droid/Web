@@ -2488,7 +2488,7 @@ function onSaleItemSelect(){
   const itemObj = items.find(i=>i.id===opt.value);
   const colorSel = document.getElementById('saleColorSelect');
   const colorField = document.getElementById('saleColorField');
-  if(itemObj && Array.isArray(itemObj.colors) && itemObj.colors.length>1){
+  if(itemObj && Array.isArray(itemObj.colors) && itemObj.colors.length>=1){
     colorSel.innerHTML = '<option value="">اختر اللون</option>' + itemObj.colors.map(c=>
       `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
     ).join('');
