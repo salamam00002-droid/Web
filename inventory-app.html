@@ -3490,8 +3490,12 @@ function renderDashboard(){
         const availableColors = allColors.filter(c => remainingQtyForColor(i, c) > 0);
         const makeChip = (c) => {
           const remC = remainingQtyForColor(i, c);
+          const cImg = i.colorImages && i.colorImages[c];
+          const nameHtml = cImg
+            ? `<span style="text-decoration:underline; cursor:pointer; color:var(--gold, inherit);" onclick='openLightbox(${JSON.stringify(cImg)}, ${JSON.stringify(i.name + " - " + c)})' title="اضغط لعرض صورة اللون">${escapeHtml(c)}</span>`
+            : escapeHtml(c);
           return `<span class="color-remain-chip">
-            <span class="dot" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}: <b>${fmt(remC)}</b>
+            <span class="dot" style="background:${colorToHex(c)}"></span>${nameHtml}: <b>${fmt(remC)}</b>
           </span>`;
         };
         if(availableColors.length){
