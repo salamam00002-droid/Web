@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>بوابة الطلبات</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -179,6 +181,26 @@ header{
 .color-chip.selected{border-color:var(--gold);background:#FEF6E4;color:var(--gold-dk);}
 .color-chip .dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.15);}
 .product-no-colors{font-size:11.5px;color:var(--muted);margin-bottom:10px;}
+.color-chip .c-thumb{
+  width:22px;height:22px;border-radius:50%;flex:none;cursor:zoom-in;
+  background-size:cover;background-position:center;background-color:var(--paper);
+  border:1.5px solid var(--line);box-shadow:0 1px 3px rgba(0,0,0,.18);
+}
+.color-chip .c-thumb:hover{border-color:var(--gold);transform:scale(1.12);}
+.lightbox-overlay{
+  position:fixed;inset:0;background:rgba(15,20,35,.92);display:none;
+  align-items:center;justify-content:center;z-index:1000;padding:24px;cursor:zoom-out;
+}
+.lightbox-overlay.active{display:flex;}
+.lightbox-overlay img{max-width:100%;max-height:85vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.lightbox-close{
+  position:absolute;top:18px;inset-inline-end:22px;background:rgba(255,255,255,.15);color:#fff;
+  border:none;width:40px;height:40px;border-radius:50%;font-size:18px;cursor:pointer;
+}
+.lightbox-caption{
+  position:absolute;bottom:22px;color:#fff;font-size:13px;font-weight:700;background:rgba(0,0,0,.5);
+  padding:6px 14px;border-radius:20px;
+}
 
 /* QTY CONTROL */
 .qty-control{display:flex;align-items:center;gap:0;}
@@ -536,6 +558,12 @@ header{
 </div>
 
 <!-- SUCCESS -->
+<div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox(event)" aria-label="إغلاق">✕</button>
+  <img id="lightboxImg" src="" alt="">
+  <div class="lightbox-caption" id="lightboxCaption"></div>
+</div>
+
 <div id="successScreen" style="display:none;">
   <div class="success-icon">✅</div>
   <h2>تم إرسال طلبك بنجاح!</h2>
@@ -573,6 +601,29 @@ function colorToHex(name){
   const k = Object.keys(COLOR_MAP).find(k=> name.includes(k));
   return k ? COLOR_MAP[k] : '#c8a0d0';
 }
+
+/* Thumbnail لصورة اللون المسجلة فى البرنامج الأصلى (لو موجودة)، وإلا نقطة اللون العادية */
+function colorSwatch(item, color){
+  const img = item.colorImages && item.colorImages[color];
+  if(img){
+    return `<span class="c-thumb" style="background-image:url('${esc(img)}')" data-item="${esc(item.id)}" data-color="${esc(color)}" onclick="openColorLightbox(event,this)" title="اضغط لعرض صورة اللون"></span>`;
+  }
+  return `<span class="dot" style="background:${colorToHex(color)}"></span>`;
+}
+function openColorLightbox(e, el){
+  e.stopPropagation(); // ما يختارش اللون، بس يفتح الصورة
+  const item = allItems.find(i=>i.id===el.dataset.item);
+  const src = item && item.colorImages && item.colorImages[el.dataset.color];
+  if(!src) return;
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxCaption').textContent = item.name+' - '+el.dataset.color;
+  document.getElementById('lightboxOverlay').classList.add('active');
+}
+function closeLightbox(e){
+  if(e) e.stopPropagation();
+  document.getElementById('lightboxOverlay').classList.remove('active');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLightbox(); });
 
 /* ═══════════════════════════════════════
    SETUP / INIT
@@ -747,7 +798,7 @@ function renderCard(item){
   const colorChips = colors.length
     ? `<div class="color-chips">${colors.map(c=>`
         <span class="color-chip" data-item="${item.id}" data-color="${esc(c)}" onclick="selectColor(this,'${item.id}','${esc(c)}')">
-          <span class="dot" style="background:${colorToHex(c)}"></span>${esc(c)} <small style="color:var(--muted)">(${remainingForColor(item,c)})</small>
+          ${colorSwatch(item,c)}${esc(c)} <small style="color:var(--muted)">(${remainingForColor(item,c)})</small>
         </span>`).join('')}</div>`
     : `<div class="product-no-colors">متاح • الكمية: ${remaining}</div>`;
 
