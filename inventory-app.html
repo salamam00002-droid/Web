@@ -338,6 +338,12 @@
   .ds-calendar-day.ds-today{border-color:var(--gold-dark); border-width:2px;}
   .ds-calendar-day.ds-selected{background:var(--gold-dark); border-color:var(--gold-dark); color:#fff;}
   .ds-calendar-day.ds-inrange{background:var(--cream);}
+  /* يوم فيه مبيعات = مظلل */
+  .ds-calendar-day.ds-hassales{
+    background:rgba(62,122,82,0.22); border-color:var(--green); color:var(--ink); font-weight:800;
+  }
+  .ds-calendar-day.ds-hassales:hover{background:rgba(62,122,82,0.35); border-color:var(--green);}
+  .ds-calendar-day.ds-selected.ds-hassales{background:var(--gold-dark); border-color:var(--gold-dark); color:#fff;}
   .ds-calendar-day .ds-dot{
     position:absolute; bottom:1px; left:50%; transform:translateX(-50%);
     width:3px; height:3px; border-radius:50%; background:var(--green);
@@ -682,28 +688,6 @@
     }
     body.printing-statement .modal{max-width:100%; max-height:none; box-shadow:none; border:none; margin:0;}
     body.printing-statement .modal-head, body.printing-statement .modal-foot{display:none;}
-
-    /* طباعة سجل مشتريات التاجر (مودال منفصل عن كشف الحساب) */
-    body.printing-merchanthistory > *:not(#merchantHistoryModalOverlay){display:none !important;}
-    body.printing-merchanthistory{padding:0; background:#fff;}
-    body.printing-merchanthistory #merchantHistoryModalOverlay{
-      position:static; background:none; padding:0; display:block !important;
-    }
-    body.printing-merchanthistory .modal{
-      max-width:100% !important; max-height:none; overflow:visible; box-shadow:none; border:none; margin:0;
-      background:#fff !important; color:#000 !important;
-    }
-    body.printing-merchanthistory .modal-head, body.printing-merchanthistory .modal-foot{display:none;}
-    body.printing-merchanthistory #merchantHistoryPrintArea *{color:#000 !important;}
-    body.printing-merchanthistory #merchantHistoryPrintArea > div[style*="overflow-x"]{overflow:visible !important;}
-    body.printing-merchanthistory .merchant-history-table{width:100%; border-collapse:collapse;}
-    body.printing-merchanthistory .merchant-history-table th,
-    body.printing-merchanthistory .merchant-history-table td{border:1px solid #999; padding:5px 8px; font-size:12px;}
-    body.printing-merchanthistory .merchant-history-table thead{display:table-header-group;}
-    body.printing-merchanthistory .merchant-history-table thead th{
-      background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    body.printing-merchanthistory .merchant-history-table tr{page-break-inside:avoid;}
 
     body.printing-dailysales > *:not(main){display:none !important;}
     body.printing-dailysales{padding:0; background:#fff; min-height:0;}
@@ -2623,9 +2607,9 @@ function openMerchantHistoryModal(profile){
 }
 
 function printMerchantHistory(){
-  document.body.classList.add('printing-merchanthistory');
+  document.body.classList.add('printing-statement');
   window.print();
-  setTimeout(()=> document.body.classList.remove('printing-merchanthistory'), 300);
+  setTimeout(()=> document.body.classList.remove('printing-statement'), 300);
 }
 
 function sendMerchantHistoryWhatsapp(){
@@ -3275,6 +3259,7 @@ function renderDsCalendarGrid(){
     if(dateStr===todayStr) classes.push('ds-today');
     if(dateStr===fromDate || dateStr===toDate) classes.push('ds-selected');
     else if(fromDate && toDate && dateStr>fromDate && dateStr<toDate) classes.push('ds-inrange');
+    if(salesDaysSet.has(dateStr)) classes.push('ds-hassales');
     const dot = salesDaysSet.has(dateStr) ? `<span class="ds-dot"></span>` : '';
     html += `<div class="${classes.join(' ')}" onclick="dsCalendarSelectDay('${dateStr}')">${day}${dot}</div>`;
   }
