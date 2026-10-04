@@ -3246,9 +3246,11 @@ function renderDsCalendarGrid(){
 
   /* أيام الشهر ده اللي فيها مبيعات مسجلة (عشان نعرض نقطة تحت رقم اليوم) */
   const salesDaysSet = new Set();
-  saleEntries.forEach(s=>{
-    const p = parseYmd(s.date);
-    if(p && p.y===year && p.mo===month+1) salesDaysSet.add(s.date);
+  /* بنستخدم كل المبيعات (الحالية + السجل القديم المفتوح والمؤرشف) عشان تطابق اللي بيظهر في السجل */
+  getUnifiedSaleRows().forEach(s=>{
+    const d = String(s.date||'').slice(0,10);
+    const p = parseYmd(d);
+    if(p && p.y===year && p.mo===month+1) salesDaysSet.add(d);
   });
 
   let html = dayLabels.map(l=> `<div class="ds-calendar-daylabel">${l}</div>`).join('');
