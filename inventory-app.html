@@ -3836,7 +3836,7 @@ function renderReceipts(){
       const it = items.find(i=>i.id===r.itemId);
       const img = (it && it.colorImages && r.color && it.colorImages[r.color]) || (it && it.image) || '';
       const th = img ? `<div class="ds-thumb"><img src="${img}" alt="" onclick="openLightbox('${img}')"></div>` : '<div class="ds-thumb">📦</div>';
-      return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(r.color||'-')}</td><td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${r.legacy?'<span class="pill unpaid" style="margin-left:4px;">سجل قديم</span>':''}${escapeHtml(r.note||'-')}</td><td>${th}</td><td>${r.legacy?'':`<button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}')">🗑</button>`}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(r.color||'-')}</td><td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${escapeHtml(r.note||'-')}</td><td>${th}</td><td>${r.legacy?'':`<button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}')">🗑</button>`}</td></tr>`;
     }).join('');
     return `<div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">📅 ${g.date?fmtDate(g.date):'بدون تاريخ'}</h2><span class="page-sub" style="margin:0;">${fmt(tot)} قطعة (${g.items.length} بند)</span></div>
     <div class="card" style="overflow-x:auto; margin-bottom:14px;"><table><thead><tr><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>المورد</th><th>ملاحظة</th><th>الصورة</th><th></th></tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -4212,7 +4212,7 @@ async function exportReceiptsXlsx(){
   rows.push([]);
   rows.push(['التاريخ','الصنف','الكود','اللون','الكمية','المورد','ملاحظة']);
   s.rows.forEach(r=>{
-    rows.push([r.date ? fmtDate(r.date) : '-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.supplier||'-', (r.legacy?'سجل قديم — ':'')+(r.note||'-')]);
+    rows.push([r.date ? fmtDate(r.date) : '-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.supplier||'-', (r.note||'-')]);
   });
 
   /* إجمالي الكمية الواردة */
