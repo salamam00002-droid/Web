@@ -896,7 +896,6 @@
         <div class="page-sub">أصناف مخصصة للبيع بالقطعة، رصيدها منفصل تماماً عن أصناف الطقم : الاسم، اللون، سعر القطعة، والكمية</div>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-outline btn-sm edit-action" onclick="importPieceItemsFromSets()">📋 نسخ أصناف الطقم (رصيد 0)</button>
         <button class="btn btn-outline btn-sm" onclick="openItemArchiveModal('piece')">🗄️ الأرشيف (<span id="pieceItemArchiveCount">0</span>)</button>
         <button class="btn btn-gold edit-action" onclick="openItemModal(null,'piece')">+ إضافة صنف بالقطعة</button>
       </div>
@@ -2220,6 +2219,17 @@ function saveItem(){
       .then((ref)=>{
         if(stockQty>0){
           logStockMovement({itemId:ref.id, itemName:name, type:'in', qty: stockQty, date: today, note:'رصيد افتتاحي', sourceType:'manual', sourceId:ref.id});
+        }
+        /* صنف جديد بالطقم → يتنسخ تلقائياً في أصناف بالقطعة (الاسم + الصورة الرئيسية فقط، رصيد 0 وسعر 0 وبدون ألوان) */
+        if(itemModalSaleType==='set'){
+          const exists = items.some(i=> itemIsPiece(i) && !i.archived && (i.name||'').trim()===name);
+          if(!exists){
+            db.collection('items').add({
+              name, category:'', sku:'', color:'', colors:[], piecesCount:1, price:0, stockQty:0,
+              alertThreshold:null, image, saleType:'piece',
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(e=> showToast('خطأ في إنشاء نسخة القطعة: '+e.message));
+          }
         }
         showToast('تمت إضافة الصنف'); closeModal('itemModalOverlay');
       })
