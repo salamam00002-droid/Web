@@ -1953,8 +1953,18 @@ function isStorageImageUrl(url){
   return typeof url === 'string' && /^https?:\/\//.test(url) &&
     (url.indexOf('firebasestorage') !== -1 || url.indexOf('storage.googleapis.com') !== -1);
 }
+/* هل الصورة دي مستخدمة في صنف تاني؟ (أصناف القطعة المنسوخة من الطقم بتشارك نفس الروابط) */
+function storageImageUsedByOtherItem(url){
+  const curId = (document.getElementById('itemId')||{}).value || '';
+  return (items||[]).some(function(it){
+    if(!it || it.id===curId) return false;
+    if(it.image===url) return true;
+    return !!(it.colorImages && Object.keys(it.colorImages).some(function(k){ return it.colorImages[k]===url; }));
+  });
+}
 function deleteStorageImageSilently(url){
   if(!storage || !isStorageImageUrl(url)) return;
+  if(storageImageUsedByOtherItem(url)) return; /* لا نحذف ملف لسه صنف آخر بيستخدمه */
   storage.refFromURL(url).delete().catch(function(){ /* الملف ممكن يكون اتمسح خلاص، تجاهل الخطأ */ });
 }
 function removeItemImage(){
