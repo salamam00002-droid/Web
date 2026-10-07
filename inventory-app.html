@@ -807,7 +807,7 @@
 
 <nav id="mainNav" style="display:none;">
   <button data-view="dashboard" class="active">لوحة التحكم</button>
-  <button data-view="dailysales">المبيعات اليومية</button>
+  <button data-view="dailysales">المبيعات والواردات</button>
   <button data-view="remaining">المخزون المتبقي</button>
   <button data-view="items">أصناف بالطقم</button>
   <button data-view="pieceitems">أصناف بالقطعة</button>
@@ -1021,7 +1021,7 @@
   <div id="view-dailysales" class="view">
     <div class="section-head" style="margin-top:0;">
       <div>
-        <div class="page-title">المبيعات اليومية</div>
+        <div class="page-title">المبيعات والواردات</div>
         <div class="page-sub">تسجيل مبيعات جديدة وعرض سجل المبيعات</div>
       </div>
       <div style="display:flex; gap:8px;">
@@ -3486,7 +3486,7 @@ function isValidEgyptianPhone(phone){
   return /^01[0-9]{9}$/.test(digits);
 }
 
-function saveMerchantTx(){ showToast('يُرجى استخدام قسم المبيعات اليومية لتسجيل البيع'); }
+function saveMerchantTx(){ showToast('يُرجى استخدام قسم المبيعات والواردات لتسجيل البيع'); }
 
 function deleteMerchantTx(id){
   if(!confirm('هل تريد أرشفة هذه المعاملة (تحويلها لمدفوعة ومنتهية)؟ سيتم خصم كمياتها نهائياً من المخزون.')) return;
@@ -4552,7 +4552,7 @@ function convertOrderToSales(orderId){
   if(!order){ showToast('الطلب غير موجود'); return; }
   const shortages = orderShortages(order);
   if(shortages.length && !confirm('تنبيه: المخزون الحالي لا يكفي لبعض البنود:\n'+shortages.join('\n')+'\n\nتحويل الطلب رغم ذلك؟')) return;
-  if(!confirm(`تحويل طلب "${order.merchantName}" (${(order.items||[]).length} أصناف) إلى مبيعات؟\nسيُضاف كل صنف في الطلب كعملية بيع منفصلة في المبيعات اليومية.`)) return;
+  if(!confirm(`تحويل طلب "${order.merchantName}" (${(order.items||[]).length} أصناف) إلى مبيعات؟\nسيُضاف كل صنف في الطلب كعملية بيع منفصلة في المبيعات والواردات.`)) return;
 
   const today = new Date().toISOString().slice(0,10);
   const batch = db.batch();
