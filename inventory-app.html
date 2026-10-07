@@ -719,6 +719,35 @@
     #dailySalesPrintArea .section-head{page-break-after:avoid; margin:16px 0 6px !important;}
     #dailySalesPrintArea .section-head h2{font-size:13px !important; color:#000 !important;}
     #dailySalesPrintArea .section-head .page-sub{font-size:11px !important; color:#000 !important;}
+    body.printing-receipts > *:not(main){display:none !important;}
+    body.printing-receipts{padding:0; background:#fff; min-height:0;}
+    body.printing-receipts main{max-width:100%; margin:0; padding:0;}
+    body.printing-receipts .view:not(#view-dailysales){display:none !important;}
+    body.printing-receipts #view-dailysales > *:not(#receiptsPrintArea){display:none !important;}
+    /* ---- تنسيق جدول المبيعات اليومية عند الطباعة ليكون واضح وسهل القراءة ---- */
+    #receiptsPrintArea{color:#000;}
+    #receiptsPrintArea .card{box-shadow:none !important; border:none !important; padding:0 !important; overflow:visible !important;}
+    #receiptsPrintArea table{
+      width:100% !important; border-collapse:collapse !important; table-layout:fixed;
+      page-break-inside:auto;
+    }
+    #receiptsPrintArea th, #receiptsPrintArea td{
+      border:1px solid #000 !important; padding:6px 8px !important;
+      text-align:center !important; vertical-align:middle; font-size:12px !important;
+      word-break:break-word;
+    }
+    #receiptsPrintArea thead{display:table-header-group;}
+    #receiptsPrintArea thead th{
+      background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+      font-weight:800 !important;
+    }
+    #receiptsPrintArea tr{page-break-inside:avoid; page-break-after:auto;}
+    /* إخفاء عمودي الصورة وزر الحذف، مش مفيدين في الطباعة */
+    #receiptsPrintArea th:nth-last-child(-n+2),
+    #receiptsPrintArea td:nth-last-child(-n+2){display:none !important;}
+    #receiptsPrintArea .section-head{page-break-after:avoid; margin:16px 0 6px !important;}
+    #receiptsPrintArea .section-head h2{font-size:13px !important; color:#000 !important;}
+    #receiptsPrintArea .section-head .page-sub{font-size:11px !important; color:#000 !important;}
   }
 </style>
 </head>
@@ -914,13 +943,17 @@
         <div class="page-sub">تسجيل مبيعات جديدة وعرض سجل المبيعات</div>
       </div>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="exportDailySalesXlsx()">⬇️ تصدير Excel</button>
-        <button class="btn btn-gold btn-sm" onclick="printDailySales()">🖨️ طباعة</button>
+        <button class="btn btn-outline btn-sm" onclick="exportDsActive()">⬇️ تصدير</button>
+        <button class="btn btn-gold btn-sm" onclick="printDsActive()">🖨️ طباعة</button>
       </div>
+    </div>
+    <div style="display:flex; gap:8px; margin:0 0 12px;">
+      <button class="btn btn-gold btn-sm" id="dsTabSales" onclick="setDsTab('sales')">📤 المبيعات</button>
+      <button class="btn btn-outline btn-sm" id="dsTabReceipts" onclick="setDsTab('receipts')">📥 الوارد</button>
     </div>
 
     <!-- نموذج إدخال بيع جديد -->
-    <div class="sale-entry-card">
+    <div class="sale-entry-card ds-sales-only">
       <div class="section-head" style="margin:0 0 14px;"><h2 style="font-size:15px;">➕ تسجيل عملية بيع جديدة</h2></div>
       <div class="form-grid">
         <div class="field">
@@ -970,7 +1003,7 @@
     </div>
 
     <!-- كالندر شهري لاختيار يوم المبيعات -->
-    <div class="ds-calendar">
+    <div class="ds-calendar ds-sales-only">
       <div class="ds-calendar-head">
         <div class="ds-calendar-nav">
           <button type="button" onclick="dsCalendarChangeMonth(-1)">‹</button>
@@ -983,7 +1016,7 @@
     </div>
 
     <!-- سجل المبيعات -->
-    <div class="filters-row">
+    <div class="filters-row ds-sales-only">
       <div class="field">
         <label>من تاريخ</label>
         <input id="dsFilterDateFrom" type="date" onchange="onDsFilterDateChanged()">
@@ -1000,9 +1033,46 @@
       </div>
     </div>
 
-    <div id="dailySalesPrintArea">
+    <div id="dailySalesPrintArea" class="ds-sales-only">
       <h2 id="dailySalesTitle" style="margin-bottom:4px;">مبيعات اليوم</h2>
       <div id="dailySalesDaysContainer"></div>
+    </div>
+
+    <!-- ===== الوارد ===== -->
+    <div class="sale-entry-card ds-rc-only" style="display:none;">
+      <div class="section-head" style="margin:0 0 14px;"><h2 style="font-size:15px;">📥 تسجيل وارد جديد</h2></div>
+      <div class="form-grid">
+        <div class="field"><label>تاريخ الدخول</label><input id="rcDate" type="date"></div>
+        <div class="field"><label>المورد (اختياري)</label><input id="rcSupplier" placeholder="اسم المورد"></div>
+        <div class="field grow2"><label>الصنف</label>
+          <select id="rcItemSelect" onchange="onRcItemSelect()"><option value="">اختر الصنف</option></select></div>
+        <div class="field" id="rcColorField" style="display:none;"><label>اللون</label>
+          <select id="rcColorSelect"><option value="">اختر اللون</option></select></div>
+        <div class="field" id="rcUnitField" style="display:none; grid-column:1 / -1;">
+          <label>نوع الوارد — الطقم كامل أو قطعة/أكتر (لكل واحدة كميتها)</label><div id="rcUnitList"></div></div>
+        <div class="field" id="rcQtyField"><label>الكمية</label><input id="rcQty" type="number" min="1" value="1"></div>
+        <div class="field grow2"><label>ملاحظة (اختياري)</label><input id="rcNote" placeholder="رقم فاتورة التوريد مثلاً"></div>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:10px;">
+        <button class="btn btn-gold" onclick="saveReceipt()">💾 حفظ الوارد</button>
+        <button class="btn btn-outline" onclick="resetReceiptForm()">مسح</button>
+      </div>
+    </div>
+    <div class="ds-calendar ds-rc-only" style="display:none;">
+      <div class="ds-calendar-head">
+        <div class="ds-calendar-nav"><button type="button" onclick="rcCalendarChangeMonth(-1)">‹</button><button type="button" onclick="rcCalendarChangeMonth(1)">›</button></div>
+        <div class="ds-calendar-title" id="rcCalendarTitle"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="rcCalendarGoToday()">اليوم</button>
+      </div>
+      <div class="ds-calendar-grid" id="rcCalendarGrid"></div>
+    </div>
+    <div class="filters-row ds-rc-only" style="display:none;">
+      <div class="field"><label>من تاريخ</label><input id="rcFilterDateFrom" type="date" onchange="onRcFilterDateChanged()"></div>
+      <div class="field"><label>إلى تاريخ</label><input id="rcFilterDateTo" type="date" onchange="onRcFilterDateChanged()"></div>
+    </div>
+    <div id="receiptsPrintArea" class="ds-rc-only" style="display:none;">
+      <h2 id="receiptsTitle" style="margin-bottom:4px;">الوارد</h2>
+      <div id="receiptsDaysContainer"></div>
     </div>
   </div>
 
@@ -1332,6 +1402,9 @@ let merchantTxs = []; // {id, merchantName, phone, date, dueDate, items:[{itemId
 let merchantProfiles = []; // {id, name, phone, address, notes, createdAt}
 let saleEntries = []; // {id, date, merchantId, merchantName, itemId, itemName, sku, color, qty, price, createdAt}
 let archivedMerchantTxs = []; // نفس شكل merchantTxs + archivedAt, بعد حذف المعاملة وأرشفتها
+let stockReceipts = []; // الوارد: {id,date,itemId,itemName,sku,color,qty,pieceId?,supplier,note}
+let rcCalendarMonth = null;
+let currentReceiptsExport = null;
 let stockMovements = []; // {id, itemId, itemName, type:'in'|'out', qty, date, note, sourceType, sourceId}
 let merchantItemRowCount = 0;
 let dsCalendarMonth = null; // Date (يوم 1 من الشهر المعروض حالياً في كالندر المبيعات اليومية)
@@ -1382,6 +1455,7 @@ function initFirebaseWithConfig(config){
       listenToStockMovements();
       listenToMerchantProfiles();
       listenToSaleEntries();
+      listenToStockReceipts();
       listenToOrders();
     });
   }catch(e){
@@ -1433,6 +1507,7 @@ function switchView(name){
   if(name==='dailysales'){
     populateSaleMerchantSelect();
     populateSaleItemSelect();
+    populateRcItemSelect();
     if(!document.getElementById('dsFilterDateFrom').value) setDailySalesToday();
     else renderDailySales();
   }
@@ -1531,6 +1606,7 @@ function _issuedSplit(itemId, color){
   };
   saleEntries.forEach(add);
   merchantTxs.forEach(tx=>(tx.items||[]).forEach(add));
+  stockReceipts.forEach(r=>add({...r, qty:-(Number(r.qty)||0)})); /* الوارد يزوّد المتاح */
   return {full, per};
 }
 function _maxPer(per){ return Math.max(0, ...Object.values(per)); }
@@ -1553,6 +1629,7 @@ function issuedQtyFor(itemId){
   const collect = e=>{ if(e.itemId===itemId) colors.add(e.color||''); };
   saleEntries.forEach(collect);
   merchantTxs.forEach(tx=>(tx.items||[]).forEach(collect));
+  stockReceipts.forEach(collect);
   let sum = 0;
   colors.forEach(c=>{ const x=_issuedSplit(itemId,c); sum += x.full+_maxPer(x.per); });
   return sum;
@@ -2258,7 +2335,8 @@ function exportFullBackup(){
     merchantProfiles: merchantProfiles.map(serializeDocForExport),
     saleEntries: saleEntries.map(serializeDocForExport),
     archivedMerchantTxs: archivedMerchantTxs.map(serializeDocForExport),
-    stockMovements: stockMovements.map(serializeDocForExport)
+    stockMovements: stockMovements.map(serializeDocForExport),
+    stockReceipts: stockReceipts.map(serializeDocForExport)
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
@@ -2334,14 +2412,16 @@ function restoreFullBackup(data){
     clearCollection('merchantProfiles'),
     clearCollection('saleEntries'),
     clearCollection('archivedMerchantTransactions'),
-    clearCollection('stockMovements')
+    clearCollection('stockMovements'),
+    clearCollection('stockReceipts')
   ]).then(()=> Promise.all([
     writeBackupCollection('items', data.items),
     writeBackupCollection('merchantTransactions', data.merchantTxs||[]),
     writeBackupCollection('merchantProfiles', data.merchantProfiles||[]),
     writeBackupCollection('saleEntries', data.saleEntries||[]),
     writeBackupCollection('archivedMerchantTransactions', data.archivedMerchantTxs||[]),
-    writeBackupCollection('stockMovements', data.stockMovements||[])
+    writeBackupCollection('stockMovements', data.stockMovements||[]),
+    writeBackupCollection('stockReceipts', data.stockReceipts||[])
   ])).then(()=>{
     showToast('تمت استعادة النسخة الاحتياطية بنجاح');
     closeModal('backupModalOverlay');
@@ -2424,6 +2504,7 @@ function listenToStockMovements(){
     stockMovements = [];
     snap.forEach(doc=> stockMovements.push({id: doc.id, ...doc.data()}));
     renderMovements();
+    if(document.getElementById('rcFilterDateFrom')?.value) renderReceipts();
   }, err=> showToast('خطأ في قراءة سجل الحركة: '+err.message));
 }
 
@@ -3298,6 +3379,185 @@ function exportCurrentStatementCsv(){
   downloadCsv('كشف حساب - ' + s.merchantName + '.csv', rows);
 }
 
+/* ===================== الوارد اليومي (بنفس أسلوب المبيعات) ===================== */
+function listenToStockReceipts(){
+  db.collection('stockReceipts').orderBy('date','desc').onSnapshot(snap=>{
+    stockReceipts = [];
+    snap.forEach(doc=> stockReceipts.push({id: doc.id, ...doc.data()}));
+    renderReceipts(); renderDashboard(); renderItems(); renderRemainingStock(); updateNotifications(); refreshSaleColors();
+  }, err=> showToast('خطأ في قراءة الوارد: '+err.message));
+}
+function setDsTab(tab){
+  const rc = tab==='receipts';
+  document.querySelectorAll('.ds-sales-only').forEach(e=> e.style.display = rc ? 'none' : '');
+  document.querySelectorAll('.ds-rc-only').forEach(e=> e.style.display = rc ? '' : 'none');
+  document.getElementById('dsTabSales').className = 'btn btn-sm ' + (rc?'btn-outline':'btn-gold');
+  document.getElementById('dsTabReceipts').className = 'btn btn-sm ' + (rc?'btn-gold':'btn-outline');
+  if(rc){
+    populateRcItemSelect();
+    if(!document.getElementById('rcDate').value) document.getElementById('rcDate').value = new Date().toISOString().slice(0,10);
+    if(!document.getElementById('rcFilterDateFrom').value){
+      const t = new Date().toISOString().slice(0,10);
+      document.getElementById('rcFilterDateFrom').value = t; document.getElementById('rcFilterDateTo').value = t;
+    }
+    renderReceipts();
+  }
+}
+function isRcTab(){ return document.getElementById('dsTabReceipts')?.classList.contains('btn-gold'); }
+function printDsActive(){ if(isRcTab()) printReceipts(); else printDailySales(); }
+function exportDsActive(){ if(isRcTab()) exportReceiptsXlsx(); else exportDailySalesXlsx(); }
+function printReceipts(){
+  document.body.classList.add('printing-receipts');
+  window.print();
+  setTimeout(()=> document.body.classList.remove('printing-receipts'), 300);
+}
+function populateRcItemSelect(){
+  const sel = document.getElementById('rcItemSelect'); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">اختر الصنف</option>' + items.filter(i=>!i.archived).map(i=>`<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
+  if(cur) sel.value = cur;
+}
+function onRcItemSelect(){
+  const it = items.find(i=>i.id===document.getElementById('rcItemSelect').value);
+  const cs = document.getElementById('rcColorSelect'), cf = document.getElementById('rcColorField');
+  if(it && Array.isArray(it.colors) && it.colors.length){
+    cs.innerHTML = '<option value="">اختر اللون</option>' + it.colors.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    cf.style.display = '';
+  } else { cs.innerHTML = ''; cf.style.display = 'none'; }
+  const pieces = itemHasPieces(it);
+  document.getElementById('rcQtyField').style.display = pieces ? 'none' : '';
+  const uf = document.getElementById('rcUnitField'), list = document.getElementById('rcUnitList');
+  if(!pieces){ uf.style.display = 'none'; list.innerHTML = ''; return; }
+  const rows = [{key:'full', label:'الطقم كامل'}].concat(it.pieces.map(p=>({key:p.id, label:p.name+(p.size?' ('+p.size+')':'')})));
+  list.innerHTML = rows.map(r=>`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <label style="display:flex;align-items:center;gap:6px;flex:1.5;min-width:150px;margin:0;"><input type="checkbox" class="rc-unit-chk" data-key="${escapeHtml(r.key)}" style="width:auto;"> ${escapeHtml(r.label)}</label>
+    <input type="number" min="1" value="1" class="rc-unit-qty" data-key="${escapeHtml(r.key)}" style="width:80px;" oninput="this.parentElement.querySelector('.rc-unit-chk').checked=true"></div>`).join('');
+  uf.style.display = '';
+}
+function resetReceiptForm(){
+  ['rcItemSelect','rcSupplier','rcNote'].forEach(id=> document.getElementById(id).value='');
+  document.getElementById('rcQty').value = 1;
+  onRcItemSelect();
+}
+function saveReceipt(){
+  const date = document.getElementById('rcDate').value;
+  const it = items.find(i=>i.id===document.getElementById('rcItemSelect').value);
+  const cf = document.getElementById('rcColorField');
+  const color = cf.style.display!=='none' ? document.getElementById('rcColorSelect').value : '';
+  const supplier = document.getElementById('rcSupplier').value.trim(), note = document.getElementById('rcNote').value.trim();
+  if(!date){ showToast('من فضلك اختر التاريخ'); return; }
+  if(!it){ showToast('من فضلك اختر الصنف'); return; }
+  if(cf.style.display!=='none' && !color){ showToast('من فضلك اختر اللون'); return; }
+  let lines;
+  if(itemHasPieces(it)){
+    lines = [...document.querySelectorAll('.rc-unit-chk')].filter(x=>x.checked).map(x=>{
+      const key = x.dataset.key;
+      return {piece: key==='full' ? null : it.pieces.find(p=>p.id===key), qty: Number(document.querySelector('.rc-unit-qty[data-key="'+key+'"]').value)||0};
+    });
+    if(!lines.length){ showToast('اختر الطقم كامل أو قطعة واحدة على الأقل'); return; }
+  } else lines = [{piece:null, qty:Number(document.getElementById('rcQty').value)||0}];
+  if(lines.some(l=>l.qty<=0)){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
+  Promise.all(lines.map(l=>{
+    const label = pieceLabel(it, l.piece);
+    return db.collection('stockReceipts').add({
+      date, itemId:it.id, itemName:label, sku:it.sku||'', color, qty:l.qty, supplier, note,
+      ...(l.piece ? {pieceId:l.piece.id, pieceName:l.piece.name, size:l.piece.size||''} : {}),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(ref=> logStockMovement({itemId:it.id, itemName:label, type:'in', qty:l.qty, date, note:'وارد'+(supplier?' من '+supplier:'')+(note?' — '+note:''), sourceType:'receipt', sourceId:ref.id}));
+  })).then(()=>{ showToast('تم حفظ الوارد'); resetReceiptForm(); }).catch(e=> showToast('خطأ: '+e.message));
+}
+function deleteReceipt(id){
+  if(!confirm('حذف الوارد ده؟ هيتخصم من المخزون الحالي.')) return;
+  db.collection('stockReceipts').doc(id).delete().then(()=> deleteMovementsBySource(id)).then(()=> showToast('تم حذف الوارد')).catch(e=> showToast('خطأ: '+e.message));
+}
+/* الوارد القديم (رصيد افتتاحي + تعديل يدوي بالزيادة) من سجل الحركة، للعرض والطباعة فقط — بدون أي تأثير على المخزون.
+   بنستبعد حركات الوارد الجديد (sourceType=receipt) وإلغاء البيع عشان ما يتكررش */
+function getLegacyReceiptRows(){
+  return stockMovements.filter(m=> m.type==='in' && m.sourceType==='manual').map(m=>{
+    const it = items.find(i=>i.id===m.itemId);
+    return {id:m.id, legacy:true, date:m.date, itemId:m.itemId, itemName:m.itemName, sku:(it&&it.sku)||'', color:'', qty:m.qty, supplier:'',
+            note: m.note || ''};
+  });
+}
+function getReceiptRows(from, to){
+  let rows = stockReceipts.concat(getLegacyReceiptRows());
+  if(from) rows = rows.filter(r=>(r.date||'')>=from);
+  if(to) rows = rows.filter(r=>(r.date||'')<=to);
+  return rows.sort((a,b)=>(a.date||'').localeCompare(b.date||'') || (a.itemName||'').localeCompare(b.itemName||''));
+}
+function renderRcCalendarGrid(){
+  const grid = document.getElementById('rcCalendarGrid'), t = document.getElementById('rcCalendarTitle');
+  if(!grid||!t) return;
+  if(!rcCalendarMonth){ const p = parseYmd(document.getElementById('rcFilterDateFrom').value) || parseYmd(new Date().toISOString().slice(0,10)); rcCalendarMonth = new Date(p.y, p.mo-1, 1); }
+  const y = rcCalendarMonth.getFullYear(), m = rcCalendarMonth.getMonth();
+  t.textContent = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'][m]+' '+y;
+  const today = new Date().toISOString().slice(0,10);
+  const from = document.getElementById('rcFilterDateFrom').value, to = document.getElementById('rcFilterDateTo').value;
+  const days = new Set(); getReceiptRows('','').forEach(r=>{ const d=String(r.date||'').slice(0,10), p=parseYmd(d); if(p&&p.y===y&&p.mo===m+1) days.add(d); });
+  let h = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'].map(l=>`<div class="ds-calendar-daylabel">${l}</div>`).join('');
+  for(let i=0;i<new Date(y,m,1).getDay();i++) h += '<div class="ds-calendar-day ds-empty">0</div>';
+  for(let d=1; d<=new Date(y,m+1,0).getDate(); d++){
+    const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, c=['ds-calendar-day'];
+    if(ds===today) c.push('ds-today');
+    if(ds===from||ds===to) c.push('ds-selected'); else if(from&&to&&ds>from&&ds<to) c.push('ds-inrange');
+    if(days.has(ds)) c.push('ds-hassales');
+    h += `<div class="${c.join(' ')}" onclick="rcCalendarSelectDay('${ds}')">${d}${days.has(ds)?'<span class="ds-dot"></span>':''}</div>`;
+  }
+  grid.innerHTML = h;
+}
+function rcCalendarChangeMonth(d){ rcCalendarMonth = new Date(rcCalendarMonth.getFullYear(), rcCalendarMonth.getMonth()+d, 1); renderRcCalendarGrid(); }
+function rcCalendarGoToday(){
+  const t = new Date().toISOString().slice(0,10), p = parseYmd(t);
+  rcCalendarMonth = new Date(p.y, p.mo-1, 1);
+  document.getElementById('rcFilterDateFrom').value = t; document.getElementById('rcFilterDateTo').value = t; renderReceipts();
+}
+function rcCalendarSelectDay(ds){
+  const f = document.getElementById('rcFilterDateFrom'), t = document.getElementById('rcFilterDateTo');
+  if(!f.value || (f.value && t.value)){ f.value = ds; t.value = ds; }
+  else if(ds < f.value){ t.value = f.value; f.value = ds; } else t.value = ds;
+  const p = parseYmd(ds); rcCalendarMonth = new Date(p.y, p.mo-1, 1);
+  document.getElementById('rcDate').value = ds;
+  renderReceipts();
+}
+function onRcFilterDateChanged(){
+  const p = parseYmd(document.getElementById('rcFilterDateFrom').value) || parseYmd(document.getElementById('rcFilterDateTo').value);
+  if(p) rcCalendarMonth = new Date(p.y, p.mo-1, 1);
+  renderReceipts();
+}
+function renderReceipts(){
+  const box = document.getElementById('receiptsDaysContainer'); if(!box) return;
+  const from = document.getElementById('rcFilterDateFrom').value, to = document.getElementById('rcFilterDateTo').value;
+  const rows = getReceiptRows(from, to);
+  let title;
+  if(from && to && from===to) title = 'وارد يوم '+fmtDate(from);
+  else if(from && to) title = 'وارد من '+fmtDate(from)+' إلى '+fmtDate(to);
+  else if(from) title = 'وارد من '+fmtDate(from); else if(to) title = 'وارد حتى '+fmtDate(to); else title = 'كل الوارد';
+  document.getElementById('receiptsTitle').textContent = title;
+  currentReceiptsExport = {title, rows};
+  renderRcCalendarGrid();
+  if(!rows.length){ box.innerHTML = '<div class="card"><div class="empty">لا يوجد وارد في الفترة المحددة.</div></div>'; return; }
+  const byDay = [];
+  rows.forEach(r=>{ let g = byDay.find(x=>x.date===r.date); if(!g){ g={date:r.date, items:[]}; byDay.push(g); } g.items.push(r); });
+  box.innerHTML = byDay.map(g=>{
+    const tot = g.items.reduce((s,r)=>s+(Number(r.qty)||0),0);
+    const trs = g.items.map(r=>{
+      const it = items.find(i=>i.id===r.itemId);
+      const img = (it && it.colorImages && r.color && it.colorImages[r.color]) || (it && it.image) || '';
+      const th = img ? `<div class="ds-thumb"><img src="${img}" alt="" onclick="openLightbox('${img}')"></div>` : '<div class="ds-thumb">📦</div>';
+      return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(r.color||'-')}</td><td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${r.legacy?'<span class="pill unpaid" style="margin-left:4px;">سجل قديم</span>':''}${escapeHtml(r.note||'-')}</td><td>${th}</td><td>${r.legacy?'':`<button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}')">🗑</button>`}</td></tr>`;
+    }).join('');
+    return `<div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">📅 ${g.date?fmtDate(g.date):'بدون تاريخ'}</h2><span class="page-sub" style="margin:0;">${fmt(tot)} قطعة (${g.items.length} بند)</span></div>
+    <div class="card" style="overflow-x:auto; margin-bottom:14px;"><table><thead><tr><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>المورد</th><th>ملاحظة</th><th>الصورة</th><th></th></tr></thead><tbody>${trs}</tbody></table></div>`;
+  }).join('');
+}
+function exportReceiptsCsv(){
+  const x = currentReceiptsExport;
+  if(!x || !x.rows.length){ showToast('لا يوجد وارد لتصديره'); return; }
+  const rows = [['الوارد اليومي'], [x.title], [], ['التاريخ','الصنف','الكود','اللون','الكمية','المورد','ملاحظة']];
+  x.rows.forEach(r=> rows.push([r.date?fmtDate(r.date):'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.supplier||'-', r.note||'-']));
+  downloadCsv('الوارد اليومي.csv', rows);
+}
+
 /* ===================== DAILY SALES ===================== */
 let currentDailySalesExport = null;
 
@@ -3648,6 +3908,107 @@ async function exportDailySalesXlsx(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'المبيعات اليومية.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportReceiptsXlsx(){
+  if(!currentReceiptsExport || currentReceiptsExport.rows.length===0){ showToast('لا يوجد وارد لتصديره'); return; }
+  const s = currentReceiptsExport;
+  const rows = [['الوارد اليومي']];
+  rows.push([s.title||'']);
+  rows.push([]);
+  rows.push(['التاريخ','الصنف','الكود','اللون','الكمية','المورد','ملاحظة']);
+  s.rows.forEach(r=>{
+    rows.push([r.date ? fmtDate(r.date) : '-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.supplier||'-', (r.legacy?'سجل قديم — ':'')+(r.note||'-')]);
+  });
+
+  /* إجمالي الكمية الواردة */
+  const grandTotal = s.rows.reduce((sum, r) => sum + (Number(r.qty)||0), 0);
+  rows.push([]);
+  rows.push(['','','','الإجمالي', grandTotal,'','']);
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('الوارد اليومي');
+  ws.views = [{ rightToLeft: true }];
+  rows.forEach(r=> ws.addRow(r));
+
+  const colCount = Math.max(...rows.map(r=>r.length));
+  const headerRowNum = 4;
+  /* دمج صفي العنوان والفترة عبر كل الأعمدة حتى لا يحسبا ضمن عرض عمود التاريخ */
+  ws.mergeCells(1,1,1,colCount);
+  ws.mergeCells(2,1,2,colCount);
+  ws.getCell(1,1).font = { bold:true, size:13 };
+  ws.getCell(2,1).font = { size:11 };
+
+  /* عرض الأعمدة يُحسب من صف العناوين وصفوف البيانات فقط، بدون صفي العنوان المدموجين */
+  const widthRows = rows.slice(headerRowNum-1);
+  for(let i=1; i<=colCount; i++){
+    let maxLen = 8;
+    widthRows.forEach(r=>{
+      const v = r[i-1];
+      const len = (v===null||v===undefined) ? 0 : String(v).length;
+      if(len>maxLen) maxLen = len;
+    });
+    ws.getColumn(i).width = Math.min(30, maxLen+2);
+  }
+
+  /* إعداد الصفحة للطباعة بورتريه مع احتواء كل الأعمدة في عرض الصفحة */
+  ws.pageSetup = {
+    orientation: 'portrait',
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true,
+    margins: { left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.2, footer:0.2 }
+  };
+
+  ws.eachRow(row=>{
+    row.eachCell({includeEmpty:true}, cell=>{
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+  });
+
+  /* حدود واضحة حوالين كل خلايا الجدول (من صف العناوين لآخر صف بيانات) */
+  const thinBorder = { style:'thin', color:{argb:'FF000000'} };
+  for(let r = headerRowNum; r <= ws.rowCount; r++){
+    ws.getRow(r).eachCell({includeEmpty:true}, cell=>{
+      cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
+    });
+  }
+  /* تظليل وتغميق صف العناوين */
+  ws.getRow(headerRowNum).eachCell({includeEmpty:true}, cell=>{
+    cell.font = { bold:true };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8E8E8'} };
+  });
+
+  /* تظليل خفيف بالتبادل لصفوف البيانات (سطر مظلل وسطر لأ) لسهولة القراءة */
+  let stripeIndex = 0;
+  for(let r = headerRowNum+1; r <= ws.rowCount; r++){
+    if(stripeIndex % 2 === 0){
+      ws.getRow(r).eachCell({includeEmpty:true}, cell=>{
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} };
+      });
+    }
+    stripeIndex++;
+  }
+
+  /* تنسيق صف الإجمالي (آخر صف) */
+  const totalRowNum = ws.rowCount;
+  const totalRow = ws.getRow(totalRowNum);
+  totalRow.eachCell({includeEmpty:true}, cell => {
+    cell.font = { bold: true, size: 12 };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B2A4A'} };
+    cell.font = { bold: true, size: 12, color: {argb:'FFFFFFFF'} };
+    cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'الوارد اليومي.xlsx';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }

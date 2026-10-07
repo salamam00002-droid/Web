@@ -586,6 +586,7 @@ let db = null;
 let allItems = [];
 let saleEntries = [];
 let merchantTxs = [];
+let stockReceipts = []; // الوارد — بيزوّد المتاح
 let cart = []; // [{itemId, itemName, color, qty, price, sku}]
 let storeName = 'بوابة الطلبات';
 
@@ -721,6 +722,13 @@ function listenData(){
     renderProducts();
   }, ()=>{});
 
+  // stockReceipts
+  db.collection('stockReceipts').onSnapshot(snap=>{
+    stockReceipts=[];
+    snap.forEach(d=>stockReceipts.push({id:d.id,...d.data()}));
+    renderProducts();
+  }, ()=>{});
+
   // merchantTxs
   db.collection('merchantTransactions').onSnapshot(snap=>{
     merchantTxs=[];
@@ -747,6 +755,7 @@ function _issuedSplit(itemId, color){
   };
   saleEntries.forEach(add);
   merchantTxs.forEach(tx=>(tx.items||[]).forEach(add));
+  stockReceipts.forEach(r=>add({...r, qty:-(Number(r.qty)||0)}));
   return {full, per};
 }
 function _maxPer(per){ return Math.max(0, ...Object.values(per)); }
@@ -769,6 +778,7 @@ function issuedQtyFor(itemId){
   const collect = e=>{ if(e.itemId===itemId) colors.add(e.color||''); };
   saleEntries.forEach(collect);
   merchantTxs.forEach(tx=>(tx.items||[]).forEach(collect));
+  stockReceipts.forEach(collect);
   let sum = 0;
   colors.forEach(c=>{ const x=_issuedSplit(itemId,c); sum += x.full+_maxPer(x.per); });
   return sum;
