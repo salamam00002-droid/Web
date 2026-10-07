@@ -721,7 +721,7 @@ function listenData(){
   }, ()=>{});
 
   // merchantTxs
-  db.collection('merchantTxs').onSnapshot(snap=>{
+  db.collection('merchantTransactions').onSnapshot(snap=>{
     merchantTxs=[];
     snap.forEach(d=>merchantTxs.push({id:d.id,...d.data()}));
     renderProducts();
