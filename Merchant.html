@@ -225,6 +225,9 @@ header{
 .add-btn:hover{background:var(--navy-2);}
 .add-btn.added{background:var(--green);}
 
+.mode-tabs{display:flex;gap:8px;margin:0 0 14px;}
+.mode-tab{flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:#fff;font-family:'Cairo',sans-serif;font-weight:800;font-size:13.5px;cursor:pointer;color:var(--navy);}
+.mode-tab.active{background:var(--navy);color:#fff;border-color:var(--navy);}
 .units-note{font-size:11.5px;font-weight:800;color:#b4432f;margin:0 0 6px;}
 .unit-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1.5px solid var(--line,#ddd);border-radius:20px;font-size:12px;cursor:pointer;margin:0 0 4px 4px;background:#fff;}
 .unit-chip.selected{border-color:var(--navy);background:var(--navy);color:#fff;}
@@ -468,6 +471,11 @@ header{
         <select class="filter-select" id="catFilter" onchange="renderProducts()">
           <option value="">كل الفئات</option>
         </select>
+      </div>
+
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" id="modeTabSet" onclick="setCatalogMode('set')">🧳 أصناف بالطقم</button>
+        <button type="button" class="mode-tab" id="modeTabPiece" onclick="setCatalogMode('piece')">🧩 أصناف بالقطعة</button>
       </div>
 
       <div id="productsContainer">
@@ -743,7 +751,22 @@ function listenData(){
 /* ===== بيع القطع المنفصلة من الطقم =====
    item.pieces = [{id,name,size,price}] (اختياري). كل عملية بيع/طلب لقطعة تحمل pieceId.
    بيع الطقم كامل ينقص من كل القطع، وبيع قطعة ينقص من رصيدها فقط. */
-function itemHasPieces(item){ return !!(item && Array.isArray(item.pieces) && item.pieces.length); }
+/* ميزة "تفاصيل القطع داخل الطقم" اتلغت: الأطقم بتتباع بالطقم بس، والقطع ليها قسم أصناف مستقل (saleType:'piece').
+   البيانات القديمة (item.pieces / سجلات pieceId) فضلت محفوظة وبتتحسب زي الأول عشان الأرصدة ما تتغيرش. */
+function itemHasPieces(item){ return false; }
+/* سعر القطعة/الصنف: لو الخيار (لون + مقاس) ليه سعر خاص بياخده، وإلا بياخد السعر الافتراضي للصنف */
+function priceFor(item, color){
+  if(item && color && item.colorPrices && item.colorPrices[color]!==undefined && item.colorPrices[color]!=='') return Number(item.colorPrices[color])||0;
+  return Number(item && item.price)||0;
+}
+
+let catalogMode = 'set'; /* 'set' = أصناف بالطقم | 'piece' = أصناف بالقطعة */
+function setCatalogMode(mode){
+  catalogMode = mode;
+  document.getElementById('modeTabSet').classList.toggle('active', mode==='set');
+  document.getElementById('modeTabPiece').classList.toggle('active', mode==='piece');
+  renderProducts();
+}
 function pieceLabel(item, piece){ return piece ? (item.name+' — '+piece.name+(piece.size?' ('+piece.size+')':'')) : (item?item.name:''); }
 function _issuedSplit(itemId, color){
   let full = 0; const per = {};
@@ -834,6 +857,7 @@ function renderProducts(){
 
   let list = allItems.filter(i=>{
     if(i.archived) return false;
+    if((i.saleType==='piece' ? 'piece' : 'set') !== catalogMode) return false;
     if(maxSellable(i)<=0) return false;
     if(cat && i.category!==cat) return false;
     if(search && !(
@@ -845,7 +869,7 @@ function renderProducts(){
   });
 
   if(!list.length){
-    container.innerHTML=`<div class="empty-state"><div class="ico">🔍</div><p>${search?'لا توجد نتائج مطابقة':'لا توجد منتجات متاحة حالياً'}</p></div>`;
+    container.innerHTML=`<div class="empty-state"><div class="ico">🔍</div><p>${search?'لا توجد نتائج مطابقة':(catalogMode==='piece'?'لا توجد أصناف بالقطعة متاحة حالياً':'لا توجد منتجات متاحة حالياً')}</p></div>`;
     return;
   }
 
@@ -877,7 +901,7 @@ function renderCard(item){
     <div class="product-body">
       ${item.category?`<div class="product-cat">${esc(item.category)}</div>`:''}
       <div class="product-name">${esc(item.name)}</div>
-      ${item.sku?`<div class="product-sku">كود: ${esc(item.sku)}${item.piecesCount?' · '+esc(item.piecesCount)+' قطع/طقم':''}</div>`:(item.piecesCount?`<div class="product-sku">${esc(item.piecesCount)} قطع/طقم</div>`:'')}
+      ${item.sku?`<div class="product-sku">كود: ${esc(item.sku)}${(item.saleType==='piece'?0:item.piecesCount)?' · '+esc((item.saleType==='piece'?0:item.piecesCount))+' قطع/طقم':''}</div>`:((item.saleType==='piece'?0:item.piecesCount)?`<div class="product-sku">${esc((item.saleType==='piece'?0:item.piecesCount))} قطع/طقم</div>`:'')}
       <div class="product-price" id="price_${item.id}">${priceHtmlFor(item, us?us.defaultPiece:'')}</div>
       ${us?`<div id="units_${item.id}">${unitsHtml(item,us)}</div>`:''}
       ${colorChips}
@@ -918,9 +942,15 @@ function unitsHtml(item, us){
   if(!us.avail.length) return `<div class="units-note">غير متاح حالياً</div>`;
   return `<div style="margin-bottom:6px;"><div class="units-note">⚠️ الطقم ناقص — المقاسات المتوفرة فقط:</div>${us.avail.map((r,i)=>pieceChip(r,i===0)).join('')}</div>`;
 }
-function priceHtmlFor(item, pieceId){
+function priceHtmlFor(item, pieceId, color){
   const piece = pieceId && itemHasPieces(item) ? item.pieces.find(p=>p.id===pieceId) : null;
-  return fmt(piece?piece.price:item.price)+' <span>جنيه / '+(piece?'قطعة':'طقم')+'</span>';
+  let p = piece ? piece.price : priceFor(item, color), from = '';
+  if(!piece && !color && item.colorPrices && Object.keys(item.colorPrices).length){
+    const ps = (Array.isArray(item.colors) && item.colors.length ? item.colors : Object.keys(item.colorPrices)).map(c=>priceFor(item,c));
+    const mn = Math.min(...ps), mx = Math.max(...ps);
+    if(ps.length && mn!==mx){ p = mn; from = 'من '; }
+  }
+  return from+fmt(p)+' <span>جنيه / '+((piece||item.saleType==='piece')?'قطعة':'طقم')+'</span>';
 }
 /* يعيد رسم وحدات البيع (مثلاً بعد اختيار لون) */
 function refreshUnits(item, color){
@@ -951,6 +981,8 @@ function selectColor(el, itemId, color){
   document.getElementById('card_'+itemId).dataset.selectedColor = color;
   updateCardImage(itemId, color);
   refreshUnits(allItems.find(i=>i.id===itemId), color);
+  const prEl = document.getElementById('price_'+itemId), itObj = allItems.find(i=>i.id===itemId);
+  if(prEl && itObj && !itemHasPieces(itObj)) prEl.innerHTML = priceHtmlFor(itObj, '', color);
 }
 
 /* تغيير الصورة الأساسية للصنف فى الكارت لصورة اللون المختار،
@@ -1023,7 +1055,7 @@ function addToCart(itemId){
   if(existing){
     existing.qty = existing.qty + qty;
   } else {
-    cart.push({itemId, itemName:pieceLabel(item,piece), sku:item.sku||'', color, qty, price:piece?piece.price:item.price, ...(piece?{pieceId:piece.id,pieceName:piece.name,size:piece.size||''}:{})});
+    cart.push({itemId, itemName:pieceLabel(item,piece), sku:item.sku||'', color, qty, price:piece?piece.price:priceFor(item,color), ...(piece?{pieceId:piece.id,pieceName:piece.name,size:piece.size||''}:{})});
   }
 
   // visual feedback
@@ -1148,7 +1180,7 @@ function submitOrder(fromDrawer){
     if(!cartFits(it,c.color,null).ok) bad.add(it.name);
   });
   if(bad.size){ btn.disabled=false; btn.textContent='📤 إرسال الطلب'; toast('⚠️ الكمية لم تعد متاحة لـ: '+[...bad].join('، ')+' — عدّل السلة'); return; }
-  cart.forEach(c=>{ const it=allItems.find(i=>i.id===c.itemId); if(!it) return; const pc=(c.pieceId&&itemHasPieces(it))?it.pieces.find(p=>p.id===c.pieceId):null; c.price = Number(pc?pc.price:it.price)||0; });
+  cart.forEach(c=>{ const it=allItems.find(i=>i.id===c.itemId); if(!it) return; const pc=(c.pieceId&&itemHasPieces(it))?it.pieces.find(p=>p.id===c.pieceId):null; c.price = Number(pc?pc.price:priceFor(it,c.color))||0; });
   const total = cart.reduce((s,c)=>s+(c.qty*c.price),0);
   const order = {
     merchantName: name,
