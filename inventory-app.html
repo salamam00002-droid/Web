@@ -756,6 +756,42 @@
     #receiptsPrintArea .section-head h2{font-size:13px !important; color:#000 !important;}
     #receiptsPrintArea .section-head .page-sub{font-size:11px !important; color:#000 !important;}
   }
+
+  /* ---------- قائمة اختيار بحث (بديل select الطويلة) ---------- */
+  .picker-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    border:1px solid var(--line); border-radius:9px; padding:10px 12px; cursor:pointer;
+    font-family:'Tajawal',sans-serif; font-size:14px; background:#FDFCFA; color:var(--ink); text-align:right;
+  }
+  html.dark-mode .picker-btn{background:var(--cream);}
+  .picker-btn .picker-label{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .picker-btn.empty .picker-label{color:var(--muted);}
+  .picker-btn .picker-caret{color:var(--muted); font-size:12px;}
+  .picker-btn:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+  .picker-overlay{
+    position:fixed; left:0; right:0; top:0; height:100%; background:rgba(0,0,0,.55); z-index:500;
+    display:none; align-items:flex-start; justify-content:center; padding:8px; box-sizing:border-box;
+  }
+  .picker-overlay.open{display:flex;}
+  .picker-panel{
+    width:100%; max-width:480px; max-height:100%; display:flex; flex-direction:column;
+    background:var(--paper); border-radius:14px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .picker-head{display:flex; align-items:center; justify-content:space-between; padding:12px 14px 6px; font-weight:800; font-size:15px; color:var(--ink);}
+  .picker-close{background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--muted); padding:2px 8px;}
+  .picker-search{margin:6px 14px 10px; width:auto; font-size:16px; padding:11px 12px;}
+  .picker-list{overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 8px 10px; flex:1;}
+  .picker-group{font-size:12px; font-weight:800; color:var(--gold-dark); padding:10px 8px 4px;}
+  .picker-opt{
+    display:block; width:100%; text-align:right; background:transparent; border:none; border-bottom:1px solid var(--line);
+    padding:13px 10px; font-family:'Tajawal',sans-serif; font-size:15px; color:var(--ink); cursor:pointer; border-radius:8px;
+  }
+  .picker-opt:hover, .picker-opt:active{background:var(--cream);}
+  .picker-opt.sel{background:var(--cream); font-weight:800; border-inline-start:4px solid var(--gold);}
+  .picker-opt small{display:block; color:var(--muted); font-size:11.5px; margin-top:2px;}
+  .picker-empty{padding:22px; text-align:center; color:var(--muted); font-size:14px;}
+  .sale-mode-toggle{display:flex; gap:8px;}
+  .sale-mode-toggle .btn{flex:1; justify-content:center;}
 </style>
 </head>
 <body>
@@ -1016,6 +1052,13 @@
           <select id="saleMerchantSelect">
             <option value="">اختر التاجر</option>
           </select>
+        </div>
+        <div class="field" style="grid-column:1 / -1;">
+          <label>نوع الأصناف</label>
+          <div class="sale-mode-toggle">
+            <button type="button" class="btn btn-gold" id="saleModeSet" onclick="setSaleItemMode('set')">🧳 بالطقم</button>
+            <button type="button" class="btn btn-outline" id="saleModePiece" onclick="setSaleItemMode('piece')">🧩 بالقطعة</button>
+          </div>
         </div>
         <div class="field grow2">
           <label>الصنف</label>
@@ -3044,13 +3087,23 @@ function groupedItemOptions(list, optFn){
   if(pcs.length)  h += `<optgroup label="🧩 أصناف بالقطعة">${pcs.map(optFn).join('')}</optgroup>`;
   return h;
 }
+let saleItemMode = 'set'; /* 'set' | 'piece' */
+function setSaleItemMode(m){
+  saleItemMode = m==='piece' ? 'piece' : 'set';
+  document.getElementById('saleModeSet').className = 'btn ' + (saleItemMode==='set' ? 'btn-gold' : 'btn-outline');
+  document.getElementById('saleModePiece').className = 'btn ' + (saleItemMode==='piece' ? 'btn-gold' : 'btn-outline');
+  const sel = document.getElementById('saleItemSelect');
+  sel.value = '';
+  populateSaleItemSelect();
+  onSaleItemSelect();
+}
 function populateSaleItemSelect(){
   const sel = document.getElementById('saleItemSelect');
   if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">اختر الصنف</option>' + groupedItemOptions(items.filter(i=>!i.archived), i=>
+  sel.innerHTML = '<option value="">اختر الصنف</option>' + items.filter(i=>!i.archived && itemIsPiece(i)===(saleItemMode==='piece')).map(i=>
     `<option value="${i.id}" data-price="${i.price}" data-sku="${escapeHtml(i.sku||'')}" data-color="${escapeHtml(i.color||'')}">${escapeHtml(i.name)}</option>`
-  );
+  ).join('');
   if(current) sel.value = current;
 }
 
@@ -4548,6 +4601,79 @@ function convertOrderToSales(orderId){
   const today = new Date().toISOString().slice(0,10);
   const saleDateEl = document.getElementById('saleDate');
   if(saleDateEl) saleDateEl.value = today;
+})();
+/* ===== قائمة اختيار بحث للتاجر والصنف (تبقى select الأصلية مخفية فكل الكود القديم يشتغل كما هو) ===== */
+(function(){
+  const protoVal = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  const norm = s => (s||'').toString().toLowerCase().replace(/[\u064B-\u0652\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim();
+  let overlay, panel, titleEl, search, list, curSel=null, rows=[];
+
+  function build(){
+    if(overlay) return;
+    overlay = document.createElement('div'); overlay.className='picker-overlay';
+    overlay.innerHTML = '<div class="picker-panel"><div class="picker-head"><span></span><button type="button" class="picker-close">✕</button></div>'+
+      '<input type="search" class="picker-search" placeholder="🔍 ابحث..." autocomplete="off"><div class="picker-list"></div></div>';
+    document.body.appendChild(overlay);
+    panel = overlay.firstChild; titleEl = panel.querySelector('.picker-head span');
+    search = panel.querySelector('.picker-search'); list = panel.querySelector('.picker-list');
+    overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+    panel.querySelector('.picker-close').onclick = close;
+    search.addEventListener('input', ()=>render(search.value));
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape' && overlay.classList.contains('open')) close(); });
+    const vv = window.visualViewport;
+    if(vv){ const fit=()=>{ overlay.style.top=vv.offsetTop+'px'; overlay.style.height=vv.height+'px'; };
+      vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); overlay._fit=fit; }
+  }
+  function collect(sel){
+    const out=[];
+    [...sel.children].forEach(ch=>{
+      if(ch.tagName==='OPTGROUP'){ out.push({group:ch.label}); [...ch.children].forEach(o=>o.value&&out.push(opt(o))); }
+      else if(ch.value) out.push(opt(ch));
+    });
+    return out;
+  }
+  const opt = o => ({v:o.value, t:o.textContent, sku:o.getAttribute('data-sku')||''});
+  function render(q){
+    const n = norm(q); let html='', count=0, pendingGroup='';
+    rows.forEach(r=>{
+      if(r.group){ pendingGroup=r.group; return; }
+      if(n && !norm(r.t+' '+r.sku).includes(n)) return;
+      if(pendingGroup){ html+='<div class="picker-group">'+pendingGroup+'</div>'; pendingGroup=''; }
+      const esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+      html+='<button type="button" class="picker-opt'+(curSel.value===r.v?' sel':'')+'" data-v="'+esc(r.v)+'">'+esc(r.t)+(r.sku?'<small>'+esc(r.sku)+'</small>':'')+'</button>';
+      count++;
+    });
+    list.innerHTML = count ? html : '<div class="picker-empty">لا توجد نتائج</div>';
+    list.querySelectorAll('.picker-opt').forEach(b=> b.onclick=()=>choose(b.dataset.v));
+  }
+  function choose(v){
+    const sel=curSel; close();
+    sel.value=v;
+    sel.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  function open(sel,title){
+    build(); curSel=sel; rows=collect(sel); titleEl.textContent=title; search.value='';
+    render(''); overlay.classList.add('open'); document.body.style.overflow='hidden';
+    if(overlay._fit) overlay._fit();
+    const cur=list.querySelector('.sel'); if(cur) cur.scrollIntoView({block:'center'});
+    if(window.matchMedia('(pointer:fine)').matches) search.focus();
+  }
+  function close(){ if(overlay) overlay.classList.remove('open'); document.body.style.overflow=''; }
+
+  function enhance(id,title){
+    const sel=document.getElementById(id); if(!sel || sel._picker) return;
+    const btn=document.createElement('button'); btn.type='button'; btn.className='picker-btn';
+    btn.innerHTML='<span class="picker-label"></span><span class="picker-caret">▾</span>';
+    const label=btn.firstChild;
+    const sync=()=>{ const o=sel.options[sel.selectedIndex]; label.textContent=o?o.textContent:''; btn.classList.toggle('empty', !(o&&o.value)); };
+    Object.defineProperty(sel,'value',{ get(){return protoVal.get.call(sel);}, set(v){protoVal.set.call(sel,v); sync();}, configurable:true });
+    new MutationObserver(sync).observe(sel,{childList:true,subtree:true});
+    sel.style.display='none'; sel.after(btn); sel._picker=btn;
+    btn.onclick=()=>open(sel,title);
+    sync();
+  }
+  enhance('saleMerchantSelect','اختر التاجر');
+  enhance('saleItemSelect','اختر الصنف');
 })();
 </script>
 </body>
