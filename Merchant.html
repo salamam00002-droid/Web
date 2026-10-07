@@ -225,6 +225,10 @@ header{
 .add-btn:hover{background:var(--navy-2);}
 .add-btn.added{background:var(--green);}
 
+.units-note{font-size:11.5px;font-weight:800;color:#b4432f;margin:0 0 6px;}
+.unit-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1.5px solid var(--line,#ddd);border-radius:20px;font-size:12px;cursor:pointer;margin:0 0 4px 4px;background:#fff;}
+.unit-chip.selected{border-color:var(--navy);background:var(--navy);color:#fff;}
+.unit-chip small{opacity:.75;}
 .remaining-badge{
   font-size:11px;font-weight:700;color:var(--muted);margin-top:6px;text-align:center;
 }
@@ -589,17 +593,14 @@ let storeName = 'بوابة الطلبات';
    COLOR HELPERS
 ═══════════════════════════════════════ */
 const COLOR_MAP = {
-  'أبيض':'#FFFFFF','أبيض مكسور':'#FAF7F0','كريمي':'#FFF8E7','أصفر':'#FACC15',
-  'ذهبي':'#D4A929','برتقالي':'#F97316','أحمر':'#EF4444','وردي':'#F472B6',
-  'فوشيا':'#E91E8C','بنفسجي':'#A855F7','أزرق':'#3B82F6','أزرق سماوي':'#38BDF8',
-  'أزرق غامق':'#1E3A5F','تركواز':'#14B8A6','أخضر':'#22C55E','أخضر زيتي':'#6B7C3A',
-  'بني':'#92400E','بيج':'#D4B896','رمادي':'#9CA3AF','رمادي غامق':'#4B5563',
-  'أسود':'#111111','كحلي':'#1B2A4A','خمري':'#881337','كاكي':'#B5A642',
+  'أسود':'#222', 'أبيض':'#f2f2f2', 'أحمر':'#b4432f', 'أزرق':'#2b4b8a', 'أزرق كحلي':'#1B2A4A',
+  'أخضر':'#3e7a52', 'بني':'#6b4a2f', 'رمادي':'#8a8a8a', 'بيج':'#d8c9a3', 'ذهبي':'#c89b3c',
+  'فضي':'#b9b9b9', 'وردي':'#d98aa0', 'بنفسجي':'#6a4a8a', 'برتقالي':'#d97a34'
 };
 function colorToHex(name){
-  if(!name) return '#ccc';
-  const k = Object.keys(COLOR_MAP).find(k=> name.includes(k));
-  return k ? COLOR_MAP[k] : '#c8a0d0';
+  if(!name) return '#cccccc';
+  for(const key in COLOR_MAP){ if(name.includes(key)) return COLOR_MAP[key]; }
+  return '#9a8f78';
 }
 
 /* Thumbnail لصورة اللون المسجلة فى البرنامج الأصلى (لو موجودة)، وإلا نقطة اللون العادية */
@@ -731,19 +732,73 @@ function listenData(){
 /* ═══════════════════════════════════════
    STOCK CALCULATION (mirrors inventory-app)
 ═══════════════════════════════════════ */
+/* ===== بيع القطع المنفصلة من الطقم =====
+   item.pieces = [{id,name,size,price}] (اختياري). كل عملية بيع/طلب لقطعة تحمل pieceId.
+   بيع الطقم كامل ينقص من كل القطع، وبيع قطعة ينقص من رصيدها فقط. */
+function itemHasPieces(item){ return !!(item && Array.isArray(item.pieces) && item.pieces.length); }
+function pieceLabel(item, piece){ return piece ? (item.name+' — '+piece.name+(piece.size?' ('+piece.size+')':'')) : (item?item.name:''); }
+function _issuedSplit(itemId, color){
+  let full = 0; const per = {};
+  const add = e=>{
+    if(e.itemId!==itemId) return;
+    if(color!==undefined && (e.color||'')!==color) return;
+    const q = Number(e.qty)||0;
+    if(e.pieceId) per[e.pieceId] = (per[e.pieceId]||0)+q; else full += q;
+  };
+  saleEntries.forEach(add);
+  merchantTxs.forEach(tx=>(tx.items||[]).forEach(add));
+  return {full, per};
+}
+function _maxPer(per){ return Math.max(0, ...Object.values(per)); }
+function remainingPieceQty(item, pieceId, color){
+  const useColor = !!(color && hasColorStock(item));
+  const base = useColor ? (Number(item.colorStock[color])||0) : (Number(item.stockQty)||0);
+  const s = _issuedSplit(item.id, useColor ? color : undefined);
+  return base - s.full - (s.per[pieceId]||0);
+}
+
+function _itemById(id){
+  const list = (typeof items!=='undefined' && Array.isArray(items)) ? items : (typeof allItems!=='undefined' ? allItems : []);
+  return list.find(i=>i.id===id);
+}
+/* المنصرف بالأطقم: لو الصنف بكميات ألوان، نحسب كل لون لوحده ثم نجمع (عشان المتبقي الكلي = مجموع متبقي الألوان) */
 function issuedQtyFor(itemId){
-  let sum=0;
-  saleEntries.forEach(s=>{ if(s.itemId===itemId) sum+=Number(s.qty)||0; });
-  merchantTxs.forEach(tx=>{ (tx.items||[]).forEach(it=>{ if(it.itemId===itemId) sum+=Number(it.qty)||0; }); });
+  const it = _itemById(itemId);
+  if(!(it && hasColorStock(it))){ const x=_issuedSplit(itemId); return x.full+_maxPer(x.per); }
+  const colors = new Set();
+  const collect = e=>{ if(e.itemId===itemId) colors.add(e.color||''); };
+  saleEntries.forEach(collect);
+  merchantTxs.forEach(tx=>(tx.items||[]).forEach(collect));
+  let sum = 0;
+  colors.forEach(c=>{ const x=_issuedSplit(itemId,c); sum += x.full+_maxPer(x.per); });
   return sum;
 }
-function remainingQtyFor(item){ return (Number(item.stockQty)||0)-issuedQtyFor(item.id); }
-function issuedForColor(itemId,color){
-  let s=0;
-  saleEntries.forEach(e=>{ if(e.itemId===itemId&&(e.color||'')===color) s+=Number(e.qty)||0; });
-  merchantTxs.forEach(tx=>{ (tx.items||[]).forEach(it=>{ if(it.itemId===itemId&&(it.color||'')===color) s+=Number(it.qty)||0; }); });
-  return s;
+function maxSellableColor(item,c){
+  if(!itemHasPieces(item)) return remainingForColor(item,c);
+  return Math.max(remainingForColor(item,c), ...item.pieces.map(p=>remainingPieceQty(item,p.id,c)));
 }
+/* هل الكمية (مع اللي في السلة بالفعل) تكفي؟ بيحسب الطقم والقطع مع بعض */
+function cartFits(item,color,extra){
+  const lines = cart.filter(c=>c.itemId===item.id && c.color===color).map(c=>({pieceId:c.pieceId||'',qty:c.qty}));
+  if(extra) lines.push(extra);
+  let full = 0; const per = {};
+  lines.forEach(l=>{ if(l.pieceId) per[l.pieceId]=(per[l.pieceId]||0)+l.qty; else full+=l.qty; });
+  if(itemHasPieces(item)){
+    for(const p of item.pieces){
+      const need = full+(per[p.id]||0), av = remainingPieceQty(item,p.id,color);
+      if(need>0 && need>av) return {ok:false,name:p.name,need,avail:av};
+    }
+    return {ok:true};
+  }
+  const av = color ? remainingForColor(item,color) : remainingQtyFor(item);
+  return full<=av ? {ok:true} : {ok:false,name:'',need:full,avail:av};
+}
+function maxSellable(item){
+  if(!itemHasPieces(item)) return remainingQtyFor(item);
+  return Math.max(remainingQtyFor(item), ...item.pieces.map(p=>remainingPieceQty(item,p.id,'')));
+}
+function remainingQtyFor(item){ return (Number(item.stockQty)||0)-issuedQtyFor(item.id); }
+function issuedForColor(itemId,color){ const x=_issuedSplit(itemId,color); return x.full+_maxPer(x.per); }
 function remainingForColor(item,color){
   if(!item.colorStock||item.colorStock[color]===undefined) return 0;
   return (Number(item.colorStock[color])||0)-issuedForColor(item.id,color);
@@ -769,7 +824,7 @@ function renderProducts(){
 
   let list = allItems.filter(i=>{
     if(i.archived) return false;
-    if(remainingQtyFor(i)<=0) return false;
+    if(maxSellable(i)<=0) return false;
     if(cat && i.category!==cat) return false;
     if(search && !(
       (i.name||'').toLowerCase().includes(search)||
@@ -789,38 +844,41 @@ function renderProducts(){
 
 function renderCard(item){
   const remaining = remainingQtyFor(item);
-  const colors    = hasColorStock(item) ? Object.keys(item.colorStock).filter(c=>remainingForColor(item,c)>0) : [];
+  const colors    = hasColorStock(item) ? Object.keys(item.colorStock).filter(c=>maxSellableColor(item,c)>0) : [];
   const inCart    = cart.some(c=>c.itemId===item.id);
   const imgHtml   = item.image
     ? `<img src="${esc(item.image)}" alt="${esc(item.name)}" loading="lazy">`
     : `<span class="no-img">📦</span>`;
 
+  const us = itemHasPieces(item) ? unitState(item,'') : null;
+  const partial = !!(us && us.incomplete);
+  const low = !partial && remaining <= getAlertThreshold(item);
+
   const colorChips = colors.length
     ? `<div class="color-chips">${colors.map(c=>`
         <span class="color-chip" data-item="${item.id}" data-color="${esc(c)}" onclick="selectColor(this,'${item.id}','${esc(c)}')">
-          ${colorSwatch(item,c)}${esc(c)} <small style="color:var(--muted)">(${remainingForColor(item,c)})</small>
+          ${colorSwatch(item,c)}${esc(c)} <small style="color:var(--muted)">(${itemHasPieces(item)&&unitState(item,c).incomplete?'ناقص':remainingForColor(item,c)})</small>
         </span>`).join('')}</div>`
-    : `<div class="product-no-colors">متاح • الكمية: ${remaining}</div>`;
-
-  const low = remaining <= 5;
+    : `<div class="product-no-colors">${partial?'متاح • قطع منفردة فقط':'متاح • الكمية: '+remaining}</div>`;
 
   return `
-  <div class="product-card ${inCart?'in-cart':''}" id="card_${item.id}">
+  <div class="product-card ${inCart?'in-cart':''}" id="card_${item.id}" data-selected-piece="${us?esc(us.defaultPiece):''}">
     <div class="product-img">${imgHtml}<span class="in-cart-badge">✓ في السلة</span></div>
     <div class="product-body">
       ${item.category?`<div class="product-cat">${esc(item.category)}</div>`:''}
       <div class="product-name">${esc(item.name)}</div>
-      ${item.sku?`<div class="product-sku">كود: ${esc(item.sku)}</div>`:''}
-      <div class="product-price">${fmt(item.price)} <span>جنيه / طقم</span></div>
+      ${item.sku?`<div class="product-sku">كود: ${esc(item.sku)}${item.piecesCount?' · '+esc(item.piecesCount)+' قطع/طقم':''}</div>`:(item.piecesCount?`<div class="product-sku">${esc(item.piecesCount)} قطع/طقم</div>`:'')}
+      <div class="product-price" id="price_${item.id}">${priceHtmlFor(item, us?us.defaultPiece:'')}</div>
+      ${us?`<div id="units_${item.id}">${unitsHtml(item,us)}</div>`:''}
       ${colorChips}
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
         <div class="qty-control">
           <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
-          <input class="qty-input" type="number" min="1" value="1" id="qty_${item.id}" onchange="validateQty(this,${remaining})">
+          <input class="qty-input" type="number" min="1" value="1" id="qty_${item.id}" onchange="validateQty(this,${maxSellable(item)})">
           <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
         </div>
       </div>
-      <div class="remaining-badge ${low?'low':''}">متبقي: ${remaining} ${low?'⚠️ كمية محدودة':''}</div>
+      <div class="remaining-badge ${low||partial?'low':''}">${partial?'⚠️ طقم ناقص — قطع منفردة فقط':'متبقي: '+remaining+(low?' ⚠️ كمية محدودة':'')}</div>
       <button class="add-btn" id="addbtn_${item.id}" onclick="addToCart('${item.id}')">+ أضف للطلب</button>
     </div>
   </div>`;
@@ -829,6 +887,51 @@ function renderCard(item){
 /* ═══════════════════════════════════════
    COLOR SELECTION
 ═══════════════════════════════════════ */
+/* حالة وحدات البيع (طقم كامل / قطع) للصنف في لون معيّن.
+   الطقم الناقص = أي قطعة خلصت → نعرض بس القطع (المقاسات) المتوفرة */
+function unitState(item, color){
+  const useColor = !!(color && hasColorStock(item));
+  const c = useColor ? color : '';
+  const sets = Math.max(0, useColor ? remainingForColor(item,color) : remainingQtyFor(item));
+  const rows = item.pieces.map(p=>({p, qty: Math.max(0, remainingPieceQty(item,p.id,c))}));
+  const incomplete = sets<=0 || rows.some(r=>r.qty<=0);
+  const avail = rows.filter(r=>r.qty>0);
+  return {sets, rows, avail, incomplete, defaultPiece: incomplete && avail.length ? avail[0].p.id : ''};
+}
+function unitsHtml(item, us){
+  if(!itemHasPieces(item)) return '';
+  const chip = (id,label,qty,sel)=>`<span class="unit-chip ${sel?'selected':''}" data-item="${item.id}" onclick="selectUnit(this,'${item.id}','${esc(id)}')">${label} <small>(${qty})</small></span>`;
+  const pieceChip = (r,sel)=>chip(r.p.id, esc(r.p.name)+(r.p.size?' ('+esc(r.p.size)+')':'')+' · '+fmt(r.p.price), r.qty, sel);
+  if(!us.incomplete){
+    return `<div style="margin-bottom:6px;">${chip('','الطقم كامل',us.sets,true)}${us.rows.map(r=>pieceChip(r,false)).join('')}</div>`;
+  }
+  if(!us.avail.length) return `<div class="units-note">غير متاح حالياً</div>`;
+  return `<div style="margin-bottom:6px;"><div class="units-note">⚠️ الطقم ناقص — المقاسات المتوفرة فقط:</div>${us.avail.map((r,i)=>pieceChip(r,i===0)).join('')}</div>`;
+}
+function priceHtmlFor(item, pieceId){
+  const piece = pieceId && itemHasPieces(item) ? item.pieces.find(p=>p.id===pieceId) : null;
+  return fmt(piece?piece.price:item.price)+' <span>جنيه / '+(piece?'قطعة':'طقم')+'</span>';
+}
+/* يعيد رسم وحدات البيع (مثلاً بعد اختيار لون) */
+function refreshUnits(item, color){
+  if(!itemHasPieces(item)) return;
+  const us = unitState(item, color);
+  const box = document.getElementById('units_'+item.id);
+  if(box) box.innerHTML = unitsHtml(item, us);
+  const card = document.getElementById('card_'+item.id);
+  if(card) card.dataset.selectedPiece = us.defaultPiece;
+  const pr = document.getElementById('price_'+item.id);
+  if(pr) pr.innerHTML = priceHtmlFor(item, us.defaultPiece);
+}
+function selectUnit(el, itemId, pieceId){
+  document.querySelectorAll(`.unit-chip[data-item="${itemId}"]`).forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('card_'+itemId).dataset.selectedPiece = pieceId;
+  const item = allItems.find(i=>i.id===itemId);
+  const piece = pieceId && itemHasPieces(item) ? item.pieces.find(p=>p.id===pieceId) : null;
+  const pr = document.getElementById('price_'+itemId);
+  if(pr && item) pr.innerHTML = fmt(piece?piece.price:item.price)+' <span>جنيه / '+(piece?'قطعة':'طقم')+'</span>';
+}
 function selectColor(el, itemId, color){
   // toggle within item's chips
   const chips = document.querySelectorAll(`.color-chip[data-item="${itemId}"]`);
@@ -837,6 +940,7 @@ function selectColor(el, itemId, color){
   // store selected color temporarily on the card
   document.getElementById('card_'+itemId).dataset.selectedColor = color;
   updateCardImage(itemId, color);
+  refreshUnits(allItems.find(i=>i.id===itemId), color);
 }
 
 /* تغيير الصورة الأساسية للصنف فى الكارت لصورة اللون المختار،
@@ -871,7 +975,7 @@ function changeQty(itemId, delta){
   const inp = document.getElementById('qty_'+itemId);
   if(!inp) return;
   const item = allItems.find(i=>i.id===itemId);
-  const max  = item ? remainingQtyFor(item) : 999;
+  const max  = item ? maxSellable(item) : 999;
   let v = (parseInt(inp.value)||1) + delta;
   v = Math.max(1, Math.min(v, max));
   inp.value = v;
@@ -892,6 +996,8 @@ function addToCart(itemId){
   const card  = document.getElementById('card_'+itemId);
   const color = card?.dataset.selectedColor || '';
   const qty   = parseInt(document.getElementById('qty_'+itemId)?.value)||1;
+  const pieceId = card?.dataset.selectedPiece || '';
+  const piece = (pieceId && itemHasPieces(item)) ? item.pieces.find(p=>p.id===pieceId) : null;
 
   // if item has colors and none selected
   if(hasColorStock(item) && !color){
@@ -899,17 +1005,15 @@ function addToCart(itemId){
   }
 
   // check remaining for color or overall
-  const avail = color ? remainingForColor(item,color) : remainingQtyFor(item);
-  if(qty > avail){ toast(`⚠️ الكمية المطلوبة (${qty}) أكبر من المتاح (${avail})`); return; }
+  const chk = cartFits(item,color,{pieceId:piece?piece.id:'',qty});
+  if(!chk.ok){ toast(`⚠️ ${chk.name?chk.name+': ':''}المطلوب (${chk.need}) مع اللي في السلة أكبر من المتاح (${chk.avail})`); return; }
 
   // merge if same item+color exists
-  const existing = cart.find(c=>c.itemId===itemId&&c.color===color);
+  const existing = cart.find(c=>c.itemId===itemId&&c.color===color&&(c.pieceId||'')===(piece?piece.id:''));
   if(existing){
-    const newQty = existing.qty + qty;
-    if(newQty > avail){ toast(`⚠️ إجمالي الكمية (${newQty}) يتجاوز المتاح`); return; }
-    existing.qty = newQty;
+    existing.qty = existing.qty + qty;
   } else {
-    cart.push({itemId, itemName:item.name, sku:item.sku||'', color, qty, price:item.price});
+    cart.push({itemId, itemName:pieceLabel(item,piece), sku:item.sku||'', color, qty, price:piece?piece.price:item.price, ...(piece?{pieceId:piece.id,pieceName:piece.name,size:piece.size||''}:{})});
   }
 
   // visual feedback
@@ -941,7 +1045,7 @@ function updateCartUI(){
   document.getElementById('cartTotal').textContent  = fmt(total)+' جنيه';
 
   // drawer / mobile bar
-  document.getElementById('barItems').textContent = count+' قطعة';
+  document.getElementById('barItems').textContent = count+' طقم';
   document.getElementById('barTotal').textContent  = fmt(total)+' جنيه';
   document.getElementById('drawerTotal').textContent = fmt(total)+' جنيه';
 
@@ -1026,12 +1130,21 @@ function submitOrder(fromDrawer){
   const btn = document.getElementById('btnSubmit');
   btn.disabled=true; btn.textContent='⏳ جاري الإرسال...';
 
+  const bad = new Set(), seen = new Set();
+  cart.forEach(c=>{
+    const k=c.itemId+'|'+c.color; if(seen.has(k)) return; seen.add(k);
+    const it=allItems.find(i=>i.id===c.itemId);
+    if(!it){ bad.add(c.itemName); return; }
+    if(!cartFits(it,c.color,null).ok) bad.add(it.name);
+  });
+  if(bad.size){ btn.disabled=false; btn.textContent='📤 إرسال الطلب'; toast('⚠️ الكمية لم تعد متاحة لـ: '+[...bad].join('، ')+' — عدّل السلة'); return; }
+  cart.forEach(c=>{ const it=allItems.find(i=>i.id===c.itemId); if(!it) return; const pc=(c.pieceId&&itemHasPieces(it))?it.pieces.find(p=>p.id===c.pieceId):null; c.price = Number(pc?pc.price:it.price)||0; });
   const total = cart.reduce((s,c)=>s+(c.qty*c.price),0);
   const order = {
     merchantName: name,
     merchantPhone: phone||'',
     note: note||'',
-    items: cart.map(c=>({itemId:c.itemId, itemName:c.itemName, sku:c.sku||'', color:c.color||'', qty:c.qty, price:c.price, subtotal:c.qty*c.price})),
+    items: cart.map(c=>({itemId:c.itemId, itemName:c.itemName, sku:c.sku||'', color:c.color||'', qty:c.qty, price:c.price, subtotal:c.qty*c.price, ...(c.pieceId?{pieceId:c.pieceId,pieceName:c.pieceName||'',size:c.size||''}:{})})),
     total,
     status: 'pending',
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1063,7 +1176,13 @@ function newOrder(){
 /* ═══════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════ */
-function fmt(n){ return (Number(n)||0).toLocaleString('en-US',{maximumFractionDigits:2}); }
+function arabicToEnglishNums(s){ return String(s).replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => d.charCodeAt(0) - 1632); }
+function fmt(n){ n = Number(arabicToEnglishNums(String(n||0)))||0; return n.toLocaleString('en-US',{maximumFractionDigits:2}); }
+function getAlertThreshold(item){
+  const t = item.alertThreshold;
+  if(t===null || t===undefined || t==='') return Math.max(2, Math.round((Number(item.stockQty)||0)*0.1));
+  return Number(t);
+}
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
 let toastTimer;
 function toast(msg){

@@ -939,6 +939,10 @@
             <option value="">اختر الصنف</option>
           </select>
         </div>
+        <div class="field" id="saleUnitField" style="display:none;">
+          <label>نوع البيع — اختر الطقم كامل أو قطعة/أكتر (لكل واحدة كميتها)</label>
+          <div id="saleUnitList"></div>
+        </div>
         <div class="field" id="saleColorField" style="display:none;">
           <label>اللون</label>
           <select id="saleColorSelect" onchange="updateSaleAvailabilityHint()">
@@ -949,12 +953,12 @@
           <label>الكود SKU</label>
           <input id="saleSku" readonly placeholder="يظهر تلقائياً" style="background:var(--cream); cursor:not-allowed;">
         </div>
-        <div class="field">
+        <div class="field" id="saleQtyField">
           <label>الكمية</label>
           <input id="saleQty" type="number" min="1" value="1" placeholder="الكمية" oninput="updateSaleAvailabilityHint()">
           <div id="saleAvailabilityHint" style="font-size:11.5px; margin-top:4px; color:var(--muted);"></div>
         </div>
-        <div class="field">
+        <div class="field" id="salePriceField">
           <label>السعر (تلقائي)</label>
           <input id="salePrice" readonly placeholder="يظهر تلقائياً" style="background:var(--cream); cursor:not-allowed;">
         </div>
@@ -1117,6 +1121,12 @@
         <div class="field">
           <label>سعر الطقم</label>
           <input id="itemPrice" type="number" min="0" step="0.01">
+        </div>
+        <div class="field" style="grid-column:1 / -1;">
+          <label>تفاصيل القطع (اختياري) — لبيع قطعة أو أكتر من الطقم منفصلة</label>
+          <div id="itemPiecesList"></div>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="addItemPiece()">+ إضافة قطعة</button>
+          <p class="helper" id="itemPiecesHint" style="margin-top:6px;"></p>
         </div>
         <div class="field" id="itemStockDisplayField" style="display:none;">
           <label>المتبقي الحالي بالمخزن (محسوب تلقائياً)</label>
@@ -1506,28 +1516,52 @@ function itemCreatedDateStr(item){
   if(isNaN(dateObj.getTime())) return '';
   return fmtDate(dateObj.toISOString().slice(0,10));
 }
+/* ===== بيع القطع المنفصلة من الطقم =====
+   item.pieces = [{id,name,size,price}] (اختياري). كل عملية بيع/طلب لقطعة تحمل pieceId.
+   بيع الطقم كامل ينقص من كل القطع، وبيع قطعة ينقص من رصيدها فقط. */
+function itemHasPieces(item){ return !!(item && Array.isArray(item.pieces) && item.pieces.length); }
+function pieceLabel(item, piece){ return piece ? (item.name+' — '+piece.name+(piece.size?' ('+piece.size+')':'')) : (item?item.name:''); }
+function _issuedSplit(itemId, color){
+  let full = 0; const per = {};
+  const add = e=>{
+    if(e.itemId!==itemId) return;
+    if(color!==undefined && (e.color||'')!==color) return;
+    const q = Number(e.qty)||0;
+    if(e.pieceId) per[e.pieceId] = (per[e.pieceId]||0)+q; else full += q;
+  };
+  saleEntries.forEach(add);
+  merchantTxs.forEach(tx=>(tx.items||[]).forEach(add));
+  return {full, per};
+}
+function _maxPer(per){ return Math.max(0, ...Object.values(per)); }
+function remainingPieceQty(item, pieceId, color){
+  const useColor = !!(color && hasColorStock(item));
+  const base = useColor ? (Number(item.colorStock[color])||0) : (Number(item.stockQty)||0);
+  const s = _issuedSplit(item.id, useColor ? color : undefined);
+  return base - s.full - (s.per[pieceId]||0);
+}
+
+function _itemById(id){
+  const list = (typeof items!=='undefined' && Array.isArray(items)) ? items : (typeof allItems!=='undefined' ? allItems : []);
+  return list.find(i=>i.id===id);
+}
+/* المنصرف بالأطقم: لو الصنف بكميات ألوان، نحسب كل لون لوحده ثم نجمع (عشان المتبقي الكلي = مجموع متبقي الألوان) */
 function issuedQtyFor(itemId){
+  const it = _itemById(itemId);
+  if(!(it && hasColorStock(it))){ const x=_issuedSplit(itemId); return x.full+_maxPer(x.per); }
+  const colors = new Set();
+  const collect = e=>{ if(e.itemId===itemId) colors.add(e.color||''); };
+  saleEntries.forEach(collect);
+  merchantTxs.forEach(tx=>(tx.items||[]).forEach(collect));
   let sum = 0;
-  // من المبيعات الجديدة
-  saleEntries.forEach(s=>{ if(s.itemId===itemId) sum += Number(s.qty)||0; });
-  // من معاملات التجار القديمة (للتوافق مع البيانات السابقة)
-  merchantTxs.forEach(tx=>{
-    (tx.items||[]).forEach(it=>{ if(it.itemId===itemId) sum += Number(it.qty)||0; });
-  });
+  colors.forEach(c=>{ const x=_issuedSplit(itemId,c); sum += x.full+_maxPer(x.per); });
   return sum;
 }
 function remainingQtyFor(item){
   return (Number(item.stockQty)||0) - issuedQtyFor(item.id);
 }
 /* المنصرف من لون معين لصنف معين */
-function issuedQtyForColor(itemId, colorName){
-  let sum = 0;
-  saleEntries.forEach(s=>{ if(s.itemId===itemId && (s.color||'')===colorName) sum += Number(s.qty)||0; });
-  merchantTxs.forEach(tx=>{
-    (tx.items||[]).forEach(it=>{ if(it.itemId===itemId && (it.color||'')===colorName) sum += Number(it.qty)||0; });
-  });
-  return sum;
-}
+function issuedQtyForColor(itemId, colorName){ const x=_issuedSplit(itemId, colorName); return x.full+_maxPer(x.per); }
 /* المتبقي بالمخزن من لون معين لصنف معين (يعمل فقط إذا كان للصنف كميات مسجلة لكل لون) */
 function remainingQtyForColor(item, colorName){
   const stock = (item.colorStock && item.colorStock[colorName]!==undefined) ? Number(item.colorStock[colorName])||0 : 0;
@@ -1546,10 +1580,68 @@ function listenToItems(){
     renderDashboard();
     renderRemainingStock();
     populateMerchantItemSelects();
+    refreshSaleColors();
     updateNotifications();
   }, err=>{ showToast('خطأ في قراءة الأصناف: '+err.message); setConnStatus(false); });
 }
 
+let itemPiecesList = [];
+function renderItemPieces(){
+  const box = document.getElementById('itemPiecesList'); if(!box) return;
+  box.innerHTML = itemPiecesList.map((p,i)=>`<div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+    <input value="${escapeHtml(p.name||'')}" placeholder="اسم القطعة" style="flex:1.4;min-width:100px;" oninput="itemPiecesList[${i}].name=this.value">
+    <input value="${escapeHtml(p.size||'')}" placeholder="المقاس" style="flex:.8;min-width:70px;" oninput="itemPiecesList[${i}].size=this.value">
+    <input type="number" min="0" step="0.01" value="${p.price??''}" placeholder="السعر" style="flex:.8;min-width:80px;" oninput="itemPiecesList[${i}].price=this.value;updateItemPiecesHint()">
+    <button type="button" class="icon-btn" onclick="removeItemPiece(${i})">✕</button></div>`).join('');
+  if(itemPiecesList.length) document.getElementById('itemPieces').value = itemPiecesList.length;
+  updateItemPiecesHint();
+}
+function updateItemPiecesHint(){
+  const h = document.getElementById('itemPiecesHint'); if(!h) return;
+  if(!itemPiecesList.length){ h.textContent=''; return; }
+  const sum = itemPiecesList.reduce((t,p)=>t+(Number(p.price)||0),0);
+  h.textContent = 'مجموع أسعار القطع: '+fmt(sum)+' — سعر الطقم كامل: '+fmt(document.getElementById('itemPrice').value||0)+' (ممكن يختلفوا)';
+}
+function addItemPiece(){
+  itemPiecesList.push({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), name:'', size:'', price:''});
+  renderItemPieces();
+}
+function removeItemPiece(i){
+  if(!confirm('حذف القطعة؟ المبيعات القديمة لها هتفضل في السجل.')) return;
+  itemPiecesList.splice(i,1); renderItemPieces();
+}
+/* قيمة المتبقي الحالي: الأطقم الكاملة بسعر الطقم + القطع الزيادة بسعر كل قطعة */
+function itemStockValue(i){
+  const sets = Math.max(0, remainingQtyFor(i));
+  let v = sets*(Number(i.price)||0);
+  if(itemHasPieces(i)) i.pieces.forEach(p=>{ v += Math.max(0, remainingPieceQty(i,p.id,'')-sets)*(Number(p.price)||0); });
+  return v;
+}
+/* تفصيل لكل لون: أطقم كاملة كام، وإيه القطع المنفردة (الطقم الناقص) */
+function pieceBreakdownHtml(item){
+  if(!itemHasPieces(item)) return '';
+  const byColor = hasColorStock(item);
+  const colors = byColor ? Object.keys(item.colorStock) : [''];
+  const blocks = colors.map(c=>{
+    const rem = item.pieces.map(p=>({p, q: Math.max(0, remainingPieceQty(item,p.id,c))}));
+    const sets = Math.max(0, Math.min(...rem.map(r=>r.q)));
+    const loose = rem.map(r=>({p:r.p, q:r.q-sets})).filter(r=>r.q>0);
+    if(sets<=0 && !loose.length) return '';
+    const label = byColor
+      ? `<span class="swatch" style="background:${colorToHex(c)}"></span>${escapeHtml(c)}`
+      : 'الصنف';
+    const looseTxt = loose.map(r=>`${escapeHtml(r.p.name)}${r.p.size?' ('+escapeHtml(r.p.size)+')':''} × ${fmt(r.q)}`).join('، ');
+    return `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);">
+      <div class="row"><span>${label}</span><span>✅ أطقم كاملة: ${fmt(sets)}</span></div>
+      ${loose.length ? `<div class="row remaining-low"><span>⚠️ طقم ناقص (قطع منفردة)</span><span>${looseTxt}</span></div>` : ''}
+    </div>`;
+  }).join('');
+  return blocks || `<div class="row remaining-low"><span>الأطقم والقطع</span><span>خلصت</span></div>`;
+}
+function pieceRowsHtml(item){
+  if(!itemHasPieces(item)) return '';
+  return item.pieces.map(p=>`<div class="row"><span>• ${escapeHtml(p.name)}${p.size?' ('+escapeHtml(p.size)+')':''}</span><span>${fmt(p.price)} · متبقي ${fmt(remainingPieceQty(item,p.id,''))}</span></div>`).join('');
+}
 function openItemModal(item){
   document.getElementById('itemModalTitle').textContent = item ? 'تعديل الصنف' : 'إضافة صنف جديد';
   document.getElementById('itemId').value = item ? item.id : '';
@@ -1569,6 +1661,8 @@ function openItemModal(item){
   renderItemColorsChips();
   document.getElementById('itemPieces').value = item ? item.piecesCount : 3;
   document.getElementById('itemPrice').value = item ? item.price : '';
+  itemPiecesList = (item && Array.isArray(item.pieces)) ? item.pieces.map(p=>({...p})) : [];
+  renderItemPieces();
   if(item){
     /* وضع التعديل: نعرض المتبقي الحالي للقراءة + حقل التعديل الاختياري */
     const currentRemaining = remainingQtyFor(item);
@@ -1851,7 +1945,8 @@ function saveItem(){
   const color = colors.join('، ');
   const colorImages = {};
   itemColorsList.forEach(c=>{ if(c.image) colorImages[c.name] = c.image; });
-  const piecesCount = Number(document.getElementById('itemPieces').value)||1;
+  const pieces = itemPiecesList.filter(p=>(p.name||'').trim()).map(p=>({id:p.id, name:p.name.trim(), size:(p.size||'').trim(), price:Number(p.price)||0}));
+  const piecesCount = pieces.length || Number(document.getElementById('itemPieces').value)||1;
   const price = Number(document.getElementById('itemPrice').value)||0;
   const usingColorStock = itemColorsList.length>0 && itemColorsManaged;
   const today = new Date().toISOString().slice(0,10);
@@ -1916,6 +2011,7 @@ function saveItem(){
     else if(id) payload.colorStock = firebase.firestore.FieldValue.delete();
     if(Object.keys(colorImages).length) payload.colorImages = colorImages;
     else payload.colorImages = firebase.firestore.FieldValue.delete();
+    payload.pieces = pieces.length ? pieces : firebase.firestore.FieldValue.delete();
 
     db.collection('items').doc(id).update(payload)
       .then(()=>{
@@ -1938,6 +2034,7 @@ function saveItem(){
     const payload = { name, category, sku, color, colors, piecesCount, price, stockQty, alertThreshold: null, image };
     if(usingColorStock) payload.colorStock = colorStock;
     if(Object.keys(colorImages).length) payload.colorImages = colorImages;
+    if(pieces.length) payload.pieces = pieces;
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('items').add(payload)
       .then((ref)=>{
@@ -2055,7 +2152,7 @@ function renderItems(){
       ${item.sku ? `<div class="sku-tag">كود: ${escapeHtml(item.sku)}</div>` : ''}
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
       ${createdDate ? `<div class="color-name" style="margin-top:-6px;">تاريخ الإضافة: ${createdDate}</div>` : ''}
-      <div class="row"><span>سعر الطقم</span><span>${fmt(item.price)}</span></div>
+      <div class="row"><span>سعر الطقم</span><span>${fmt(item.price)}</span></div>${pieceRowsHtml(item)}
       <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 إجمالي القطع بالمخزن</span><span>${fmt(remaining)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
       ${isStagnant ? `<div class="row stagnant-warn"><span>⏳ راكد منذ</span><span>${stagnantDays} يوم</span></div>` : ''}
@@ -2272,7 +2369,7 @@ function renderRemainingStock(){
       <div class="color-name"><span class="swatch" style="background:${colorToHex(item.color)}"></span>${escapeHtml(item.color||'—')}</div>
       <div class="row"><span>الكمية بالمخزن</span><span>${fmt(item.stockQty)}</span></div>
       <div class="row"><span>المنصرف</span><span>${fmt(issued)}</span></div>
-      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>
+      <div class="row ${remaining<0?'remaining-low':''} ${lowStock?'remaining-low':''}"><span>📦 المتبقي</span><span>${fmt(remaining)}</span></div>${pieceBreakdownHtml(item)}
       ${hasColorStock(item) ? `
       <div class="color-stock-mini">
         ${Object.keys(item.colorStock).map(c=>{
@@ -2636,6 +2733,7 @@ function listenToSaleEntries(){
     renderRemainingStock();
     updateNotifications();
     populateDsFilterMerchant();
+    refreshSaleColors();
   }, err=> showToast('خطأ في قراءة المبيعات: '+err.message));
 }
 
@@ -2669,6 +2767,105 @@ function populateDsFilterMerchant(){
   if(current) sel.value = current;
 }
 
+function populateSaleUnits(itemId){
+  const f = document.getElementById('saleUnitField'), list = document.getElementById('saleUnitList');
+  const it = items.find(i=>i.id===itemId);
+  const plain = !itemHasPieces(it);
+  ['saleQtyField','salePriceField'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = plain ? '' : 'none'; });
+  if(plain){ f.style.display='none'; list.innerHTML=''; return; }
+  const rows = [{key:'full', label:'الطقم كامل', price:it.price}].concat(it.pieces.map(p=>({key:p.id, label:p.name+(p.size?' ('+p.size+')':''), price:p.price})));
+  list.innerHTML = '<div id="saleUnitNote" style="display:none;font-size:12px;font-weight:800;color:#b4432f;margin-top:4px;">⚠️ الطقم ناقص — المقاسات المتوفرة فقط:</div>' + rows.map(r=>`<div class="sale-unit-row" id="saleUnitRow_${escapeHtml(r.key)}" style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <label style="display:flex;align-items:center;gap:6px;flex:1.5;min-width:150px;margin:0;"><input type="checkbox" class="sale-unit-chk" data-key="${escapeHtml(r.key)}" style="width:auto;"> ${escapeHtml(r.label)} — ${fmt(r.price)}</label>
+    <input type="number" min="1" value="1" class="sale-unit-qty" data-key="${escapeHtml(r.key)}" style="width:80px;" oninput="this.parentElement.querySelector('.sale-unit-chk').checked=true">
+    <span id="saleUnitAvail_${escapeHtml(r.key)}" style="font-size:11.5px;color:var(--muted);"></span></div>`).join('');
+  f.style.display=''; f.style.gridColumn='1 / -1';
+  refreshSaleUnitList();
+}
+function refreshSaleUnitList(){
+  const itemObj = items.find(i=>i.id===document.getElementById('saleItemSelect').value);
+  if(!itemHasPieces(itemObj)) return;
+  const cf = document.getElementById('saleColorField'), cs = document.getElementById('saleColorSelect');
+  const color = (cf.style.display!=='none' && cs) ? cs.value : '';
+  const set = (k,v)=>{ const e=document.getElementById('saleUnitAvail_'+k); if(e) e.textContent='المتاح: '+fmt(v); };
+  const sets = Math.max(0, (hasColorStock(itemObj)&&color) ? remainingQtyForColor(itemObj,color) : remainingQtyFor(itemObj));
+  const pq = itemObj.pieces.map(p=>({p, q:Math.max(0, remainingPieceQty(itemObj,p.id,color))}));
+  /* الطقم ناقص = أي قطعة خلصت → نخفي "الطقم كامل" والقطع اللي خلصت ونعرض المتاح بس */
+  const incomplete = sets<=0 || pq.some(r=>r.q<=0);
+  const show = (k,vis)=>{
+    const row=document.getElementById('saleUnitRow_'+k); if(!row) return;
+    row.style.display = vis ? 'flex' : 'none';
+    if(!vis){ const chk=row.querySelector('.sale-unit-chk'); if(chk) chk.checked=false; }
+  };
+  set('full', sets);
+  pq.forEach(r=>set(r.p.id, r.q));
+  show('full', !incomplete);
+  pq.forEach(r=>show(r.p.id, !incomplete || r.q>0));
+  const note=document.getElementById('saleUnitNote');
+  if(note){
+    note.style.display = incomplete ? '' : 'none';
+    note.textContent = pq.some(r=>r.q>0) ? '⚠️ الطقم ناقص — المقاسات المتوفرة فقط:' : '⚠️ لا توجد قطع متاحة';
+  }
+}
+function getSaleUnit(){ return {itemObj: items.find(i=>i.id===document.getElementById('saleItemSelect').value), piece:null}; }
+function saveSalePieces(c){
+  const {dateVal, merchantId, merchantProfile, itemObj, color, sku} = c;
+  const chosen = [...document.querySelectorAll('.sale-unit-chk')].filter(x=>x.checked).map(x=>{
+    const key = x.dataset.key;
+    const qty = Number(document.querySelector('.sale-unit-qty[data-key="'+key+'"]').value)||0;
+    const piece = key==='full' ? null : itemObj.pieces.find(p=>p.id===key);
+    return {piece, qty, price: Number(piece ? piece.price : itemObj.price)||0};
+  });
+  if(!chosen.length){ showToast('اختر الطقم كامل أو قطعة واحدة على الأقل'); return; }
+  if(chosen.some(r=>r.qty<=0)){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
+  const fullQty = (chosen.find(r=>!r.piece)||{}).qty || 0;
+  for(const p of itemObj.pieces){
+    const need = fullQty + ((chosen.find(r=>r.piece && r.piece.id===p.id)||{}).qty || 0);
+    const avail = remainingPieceQty(itemObj, p.id, color);
+    if(need>0 && need>avail){ showToast(`"${p.name}": المطلوب ${fmt(need)} أكبر من المتاح ${fmt(avail)}`); return; }
+  }
+  const mName = merchantProfile ? merchantProfile.name : '';
+  Promise.all(chosen.map(r=>{
+    const label = pieceLabel(itemObj, r.piece);
+    const payload = {date:dateVal, merchantId, merchantName:mName, itemId:itemObj.id, itemName:label, sku, color, qty:r.qty, price:r.price,
+      ...(r.piece ? {pieceId:r.piece.id, pieceName:r.piece.name, size:r.piece.size||''} : {}),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()};
+    return db.collection('saleEntries').add(payload).then(ref=>{
+      logStockMovement({itemId:itemObj.id, itemName:label, type:'out', qty:r.qty, date:dateVal, note:'بيع للتاجر: '+mName, sourceType:'sale', sourceId:ref.id});
+    });
+  })).then(()=>{ showToast('تم حفظ البيع بنجاح'); resetSaleForm(); }).catch(e=> showToast('خطأ: '+e.message));
+}
+function availableFor(itemObj, color, piece){
+  if(piece) return remainingPieceQty(itemObj, piece.id, color);
+  return (hasColorStock(itemObj) && color) ? remainingQtyForColor(itemObj, color) : remainingQtyFor(itemObj);
+}
+/* اللون متاح للبيع؟ (لو الصنف بكميات ألوان: لازم يكون فيه طقم أو أي قطعة متبقية منه) */
+function saleColorAvailable(itemObj, c){
+  if(!hasColorStock(itemObj)) return true;
+  const sets = remainingQtyForColor(itemObj, c);
+  const pcs = itemHasPieces(itemObj) ? itemObj.pieces.map(p=>remainingPieceQty(itemObj, p.id, c)) : [];
+  return Math.max(sets, ...pcs) > 0;
+}
+function populateSaleColors(itemObj){
+  const colorSel = document.getElementById('saleColorSelect');
+  const colorField = document.getElementById('saleColorField');
+  const prev = colorSel.value;
+  if(!(itemObj && Array.isArray(itemObj.colors) && itemObj.colors.length>=1)){
+    colorSel.innerHTML = ''; colorField.style.display = 'none'; return;
+  }
+  const avail = itemObj.colors.filter(c=> saleColorAvailable(itemObj, c));
+  colorSel.innerHTML = avail.length
+    ? '<option value="">اختر اللون</option>' + avail.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+    : '<option value="">لا توجد ألوان متوفرة</option>';
+  if(avail.includes(prev)) colorSel.value = prev;
+  colorField.style.display = '';
+}
+/* يحدّث قائمة الألوان والمتاح لما تتغير بيانات المخزون/المبيعات */
+function refreshSaleColors(){
+  const it = items.find(i=>i.id===document.getElementById('saleItemSelect').value);
+  if(!it) return;
+  populateSaleColors(it);
+  updateSaleAvailabilityHint();
+}
 function onSaleItemSelect(){
   const sel = document.getElementById('saleItemSelect');
   const opt = sel.options[sel.selectedIndex];
@@ -2676,24 +2873,16 @@ function onSaleItemSelect(){
     document.getElementById('salePrice').value = '';
     document.getElementById('saleSku').value = '';
     document.getElementById('saleColorField').style.display = 'none';
+    populateSaleUnits('');
     updateSaleAvailabilityHint();
     return;
   }
   document.getElementById('salePrice').value = opt.getAttribute('data-price')||'';
   document.getElementById('saleSku').value = opt.getAttribute('data-sku')||'';
+  populateSaleUnits(opt.value);
   // ألوان الصنف
   const itemObj = items.find(i=>i.id===opt.value);
-  const colorSel = document.getElementById('saleColorSelect');
-  const colorField = document.getElementById('saleColorField');
-  if(itemObj && Array.isArray(itemObj.colors) && itemObj.colors.length>=1){
-    colorSel.innerHTML = '<option value="">اختر اللون</option>' + itemObj.colors.map(c=>
-      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
-    ).join('');
-    colorField.style.display = '';
-  } else {
-    colorSel.innerHTML = '';
-    colorField.style.display = 'none';
-  }
+  populateSaleColors(itemObj);
   updateSaleAvailabilityHint();
 }
 
@@ -2701,6 +2890,7 @@ function onSaleItemSelect(){
 function updateSaleAvailabilityHint(){
   const hint = document.getElementById('saleAvailabilityHint');
   if(!hint) return;
+  refreshSaleUnitList();
   const itemId = document.getElementById('saleItemSelect').value;
   const itemObj = items.find(i=>i.id===itemId);
   if(!itemObj){ hint.textContent=''; return; }
@@ -2709,9 +2899,7 @@ function updateSaleAvailabilityHint(){
   const colorSel = document.getElementById('saleColorSelect');
   const color = (colorField.style.display !== 'none' && colorSel) ? colorSel.value : '';
 
-  const available = (hasColorStock(itemObj) && color)
-    ? remainingQtyForColor(itemObj, color)
-    : remainingQtyFor(itemObj);
+  const available = availableFor(itemObj, color, getSaleUnit().piece);
 
   const qty = Number(document.getElementById('saleQty').value)||0;
   const over = qty > available;
@@ -2726,6 +2914,7 @@ function resetSaleForm(){
   document.getElementById('salePrice').value = '';
   document.getElementById('saleSku').value = '';
   document.getElementById('saleColorField').style.display = 'none';
+  populateSaleUnits('');
   updateSaleAvailabilityHint();
 }
 
@@ -2743,16 +2932,16 @@ function saveSaleEntry(){
   if(!dateVal){ showToast('من فضلك اختر التاريخ'); return; }
   if(!merchantId){ showToast('من فضلك اختر التاجر'); return; }
   if(!itemId){ showToast('من فضلك اختر الصنف'); return; }
-  if(qty<=0){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
+  if(qty<=0 && !itemHasPieces(items.find(i=>i.id===itemId))){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
   if(colorField.style.display !== 'none' && !color){ showToast('من فضلك اختر اللون'); return; }
 
   const merchantProfile = merchantProfiles.find(p=>p.id===merchantId);
   const itemObj = items.find(i=>i.id===itemId);
   if(!itemObj){ showToast('تعذر إيجاد الصنف المحدد'); return; }
 
-  const availableQty = (hasColorStock(itemObj) && color)
-    ? remainingQtyForColor(itemObj, color)
-    : remainingQtyFor(itemObj);
+  if(itemHasPieces(itemObj)) return saveSalePieces({dateVal, merchantId, merchantProfile, itemObj, color, sku});
+  const salePiece = getSaleUnit().piece;
+  const availableQty = availableFor(itemObj, color, salePiece);
 
   if(qty > availableQty){
     showToast(availableQty <= 0
@@ -2766,9 +2955,10 @@ function saveSaleEntry(){
     merchantId,
     merchantName: merchantProfile ? merchantProfile.name : '',
     itemId,
-    itemName: itemObj ? itemObj.name : '',
+    itemName: pieceLabel(itemObj, salePiece),
     sku,
     color,
+    ...(salePiece ? {pieceId:salePiece.id, pieceName:salePiece.name, size:salePiece.size||''} : {}),
     qty,
     price,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3479,7 +3669,7 @@ function renderDashboard(){
   const totalStock = activeItems.reduce((s,i)=> s + (Number(i.stockQty)||0), 0);
   const totalIssued = activeItems.reduce((s,i)=> s + issuedQtyFor(i.id), 0);
   const totalRemaining = totalStock - totalIssued;
-  const stockValue = activeItems.reduce((s,i)=> s + (Number(i.stockQty)||0)*(Number(i.price)||0), 0);
+  const stockValue = activeItems.reduce((s,i)=> s + itemStockValue(i), 0);
   const revenue = saleEntries.reduce((s,r)=> s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
 
   document.getElementById('statTotalStock').textContent = fmt(totalStock);
@@ -3662,9 +3852,31 @@ function deleteOrder(orderId){
     .catch(e=> showToast('خطأ: '+e.message));
 }
 
+function orderShortages(order){
+  const groups = {};
+  (order.items||[]).forEach(it=>{ if(!it.itemId) return; const k=it.itemId+'|'+(it.color||''); (groups[k]=groups[k]||[]).push(it); });
+  const out = [];
+  Object.keys(groups).forEach(k=>{
+    const [id,color] = k.split('|'); const item = items.find(i=>i.id===id); if(!item) return;
+    let full = 0; const per = {};
+    groups[k].forEach(it=>{ const q=Number(it.qty)||0; if(it.pieceId) per[it.pieceId]=(per[it.pieceId]||0)+q; else full+=q; });
+    if(itemHasPieces(item)){
+      item.pieces.forEach(p=>{
+        const need = full+(per[p.id]||0), av = remainingPieceQty(item,p.id,color);
+        if(need>0 && need>av) out.push(`${item.name} — ${p.name}${color?' ('+color+')':''}: المطلوب ${fmt(need)} والمتاح ${fmt(av)}`);
+      });
+    } else {
+      const av = (hasColorStock(item)&&color) ? remainingQtyForColor(item,color) : remainingQtyFor(item);
+      if(full>av) out.push(`${item.name}${color?' ('+color+')':''}: المطلوب ${fmt(full)} والمتاح ${fmt(av)}`);
+    }
+  });
+  return out;
+}
 function convertOrderToSales(orderId){
   const order = orders.find(o=>o.id===orderId);
   if(!order){ showToast('الطلب غير موجود'); return; }
+  const shortages = orderShortages(order);
+  if(shortages.length && !confirm('تنبيه: المخزون الحالي لا يكفي لبعض البنود:\n'+shortages.join('\n')+'\n\nتحويل الطلب رغم ذلك؟')) return;
   if(!confirm(`تحويل طلب "${order.merchantName}" (${(order.items||[]).length} أصناف) إلى مبيعات؟\nسيُضاف كل صنف في الطلب كعملية بيع منفصلة في المبيعات اليومية.`)) return;
 
   const today = new Date().toISOString().slice(0,10);
@@ -3681,6 +3893,7 @@ function convertOrderToSales(orderId){
       color: it.color||'',
       qty: Number(it.qty)||0,
       price: Number(it.price)||0,
+      ...(it.pieceId ? {pieceId:it.pieceId, pieceName:it.pieceName||'', size:it.size||''} : {}),
       date: today,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       sourceType: 'order',
