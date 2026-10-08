@@ -150,6 +150,7 @@
     display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
     gap:14px; margin-bottom:26px;
   }
+  .dash-group-title{font-size:16px; font-weight:800; margin:18px 0 10px; padding:8px 12px; background:var(--cream); border:1px solid var(--line); border-radius:12px;}
   .stat-card{
     background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
     padding:18px; box-shadow:var(--shadow); position:relative; overflow:hidden;
@@ -891,13 +892,23 @@
     <div class="page-title">لوحة التحكم</div>
     <div class="page-sub">نظرة عامة على المخزون والحسابات</div>
 
+    <div class="dash-group-title">🧳 أصناف بالطقم</div>
     <div class="stats-grid">
-      <div class="stat-card"><div class="label">عدد الأصناف</div><div class="value" id="statItemsCount">0</div></div>
-      <div class="stat-card good"><div class="label">إجمالي القطع في المخزن</div><div class="value" id="statTotalStock">0</div></div>
-      <div class="stat-card warn"><div class="label">إجمالي المنصرف (مباع)</div><div class="value" id="statTotalIssued">0</div></div>
-      <div class="stat-card"><div class="label">إجمالي المتبقي</div><div class="value" id="statTotalRemaining">0</div></div>
-      <div class="stat-card good"><div class="label">قيمة المخزون الحالي</div><div class="value" id="statStockValue">0</div></div>
-      <div class="stat-card good"><div class="label">إجمالي إيرادات المبيعات</div><div class="value" id="statRevenue">0</div></div>
+      <div class="stat-card"><div class="label">عدد الأصناف</div><div class="value" id="statItemsCountSet">0</div></div>
+      <div class="stat-card good"><div class="label">إجمالي القطع في المخزن</div><div class="value" id="statTotalStockSet">0</div></div>
+      <div class="stat-card warn"><div class="label">إجمالي المنصرف (مباع)</div><div class="value" id="statTotalIssuedSet">0</div></div>
+      <div class="stat-card"><div class="label">إجمالي المتبقي</div><div class="value" id="statTotalRemainingSet">0</div></div>
+      <div class="stat-card good"><div class="label">قيمة المخزون الحالي</div><div class="value" id="statStockValueSet">0</div></div>
+      <div class="stat-card good"><div class="label">إجمالي إيرادات المبيعات</div><div class="value" id="statRevenueSet">0</div></div>
+    </div>
+    <div class="dash-group-title">🧩 أصناف بالقطعة</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">عدد الأصناف</div><div class="value" id="statItemsCountPiece">0</div></div>
+      <div class="stat-card good"><div class="label">إجمالي القطع في المخزن</div><div class="value" id="statTotalStockPiece">0</div></div>
+      <div class="stat-card warn"><div class="label">إجمالي المنصرف (مباع)</div><div class="value" id="statTotalIssuedPiece">0</div></div>
+      <div class="stat-card"><div class="label">إجمالي المتبقي</div><div class="value" id="statTotalRemainingPiece">0</div></div>
+      <div class="stat-card good"><div class="label">قيمة المخزون الحالي</div><div class="value" id="statStockValuePiece">0</div></div>
+      <div class="stat-card good"><div class="label">إجمالي إيرادات المبيعات</div><div class="value" id="statRevenuePiece">0</div></div>
     </div>
 
     <div class="section-head"><h2>📦 جرد المتبقي بالمخزن (لكل صنف بألوانه)</h2></div>
@@ -4424,18 +4435,25 @@ function sendStatementWhatsapp(){ showToast('استخدم زر الواتساب 
 
 function renderDashboard(){
   const activeItems = items.filter(i=>!i.archived);
-  document.getElementById('statItemsCount').textContent = fmt(activeItems.length);
-  const totalStock = activeItems.reduce((s,i)=> s + stockTotalFor(i), 0);
-  const totalIssued = activeItems.reduce((s,i)=> s + issuedShownFor(i), 0);
-  const totalRemaining = totalStock - totalIssued;
-  const stockValue = activeItems.reduce((s,i)=> s + itemStockValue(i), 0);
-  const revenue = saleEntries.reduce((s,r)=> s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
-
-  document.getElementById('statTotalStock').textContent = fmt(totalStock);
-  document.getElementById('statTotalIssued').textContent = fmt(totalIssued);
-  document.getElementById('statTotalRemaining').textContent = fmt(totalRemaining);
-  document.getElementById('statStockValue').textContent = fmt(stockValue);
-  document.getElementById('statRevenue').textContent = fmt(revenue);
+  /* إحصائيات لوحة التحكم منفصلة: أصناف بالطقم / أصناف بالقطعة (الصنف المحذوف نهائياً يُحسب مبيعاته ضمن الطقم) */
+  const fillDashStats = (suffix, list, isPieceGroup)=>{
+    const ids = new Set(list.map(i=> i.id));
+    const totalStock = list.reduce((s,i)=> s + stockTotalFor(i), 0);
+    const totalIssued = list.reduce((s,i)=> s + issuedShownFor(i), 0);
+    const stockValue = list.reduce((s,i)=> s + itemStockValue(i), 0);
+    const pieceIds = new Set(items.filter(i=> itemIsPiece(i)).map(i=> i.id));
+    const revenue = saleEntries.filter(r=> isPieceGroup ? pieceIds.has(r.itemId) : !pieceIds.has(r.itemId))
+      .reduce((s,r)=> s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
+    const set = (id,v)=>{ const el = document.getElementById(id+suffix); if(el) el.textContent = fmt(v); };
+    set('statItemsCount', list.length);
+    set('statTotalStock', totalStock);
+    set('statTotalIssued', totalIssued);
+    set('statTotalRemaining', totalStock - totalIssued);
+    set('statStockValue', stockValue);
+    set('statRevenue', revenue);
+  };
+  fillDashStats('Set', activeItems.filter(i=> !itemIsPiece(i)), false);
+  fillDashStats('Piece', activeItems.filter(i=> itemIsPiece(i)), true);
 
   const auditItems = [...activeItems].sort((a,b)=> (a.name||'').localeCompare(b.name||'','ar'));
   const auditBox = document.getElementById('stockAuditList');
