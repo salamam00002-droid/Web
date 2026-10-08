@@ -361,6 +361,22 @@
     #itemColorInput{flex-basis:100%;}
     .color-add-row .color-add-btn{flex:1 1 100%; padding:10px 12px;}
   }
+  .color-rows{display:flex; flex-direction:column; gap:10px; margin-top:10px;}
+  .color-row{background:var(--cream); border:1px solid var(--line); border-radius:16px; padding:10px;}
+  .color-row-top{display:flex; align-items:center; gap:10px;}
+  .color-row .color-chip-thumb{width:44px; height:44px; font-size:18px;}
+  .color-row .color-chip-thumb .cq-img-x{width:22px; height:22px; line-height:22px; font-size:12px; top:-7px; left:-7px;}
+  .color-row .cq-name{flex:1; min-width:0; width:auto; font-size:16px; font-weight:700; padding:10px 12px; min-height:46px; border-radius:12px;}
+  .color-row .cq-x{flex:none; width:40px; height:40px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800; color:var(--muted); cursor:pointer; border-radius:50%;}
+  .color-row .cq-x:hover{color:var(--red);}
+  .color-row-fields{display:flex; gap:10px; margin-top:8px;}
+  .color-row-fields label{flex:1; display:flex; flex-direction:column; gap:3px; font-size:11.5px; font-weight:700; color:var(--muted);}
+  .color-row-fields input{width:100%; min-width:0; font-size:16px; text-align:center; padding:10px 8px; min-height:46px; border-radius:12px;}
+  @media(max-width:560px){
+    #itemModalOverlay .field input, #itemModalOverlay .field select{min-height:46px; font-size:16px;}
+    .color-add-row input{min-height:48px; font-size:16px;}
+    .color-add-row .color-add-btn{min-height:48px; font-size:15px;}
+  }
   .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 6px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
   .color-qty-chip input{width:56px; padding:3px 6px; font-size:12px; border-radius:14px; text-align:center;}
   .color-qty-chip .cq-x{cursor:pointer; font-weight:800; color:var(--muted); padding:0 2px;}
@@ -1283,7 +1299,7 @@
             <input id="itemColorPriceInput" type="number" min="0" step="0.01" placeholder="سعر القطعة" style="display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addItemColorChip();}">
             <button type="button" class="btn btn-outline btn-sm color-add-btn" onclick="addItemColorChip()">+ إضافة لون</button>
           </div>
-          <div id="itemColorsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+          <div id="itemColorsChips" class="color-rows"></div>
           <input type="file" id="itemColorImageFile" accept="image/*" style="display:none;" onchange="handleColorImageChange(event)">
           <p class="helper" style="margin-top:6px;">اضغط على الدائرة بجانب اسم اللون لإضافة/تغيير صورة خاصة بهذا اللون (اختياري).</p>
           <p class="helper" style="margin-top:6px;">هذا الحقل يعرض دائماً العدد الفعلي المتبقي بالمخزن الآن (بعد خصم المصروف للتجار)، ويُحسب تلقائياً من مجموع كميات الألوان المتبقية عند إضافة لون بكمية.</p>
@@ -1871,7 +1887,7 @@ function openItemModal(item, saleType){
     const hasQty = item && item.colorStock && item.colorStock[c]!==undefined;
     const image = (item && item.colorImages && item.colorImages[c]) || '';
     const price = (item && item.colorPrices && item.colorPrices[c]!==undefined) ? item.colorPrices[c] : '';
-    return {name: c, qty: hasQty ? remainingQtyForColor(item, c) : 0, image, price};
+    return {name: c, orig: c, qty: hasQty ? remainingQtyForColor(item, c) : 0, image, price};
   });
   document.getElementById('itemColorInput').value = '';
   document.getElementById('itemColorQtyInput').value = '';
@@ -1907,17 +1923,30 @@ function closeModal(id){ document.getElementById(id).classList.remove('active');
 function renderItemColorsChips(){
   const box = document.getElementById('itemColorsChips');
   if(!box) return;
+  const isPc = itemModalSaleType==='piece';
   box.innerHTML = itemColorsList.length ? itemColorsList.map((c,idx)=>`
-    <span class="color-qty-chip">
-      <span class="color-chip-thumb" style="${c.image ? `background-image:url('${c.image}')` : `background:${colorToHex(c.name)}`}" onclick="triggerColorImagePick(${idx})" title="إضافة/تغيير صورة اللون">
-        ${c.image ? `<span class="cq-img-x" onclick="event.stopPropagation(); removeColorImage(${idx})" title="إزالة صورة اللون">✕</span>` : '📷'}
-      </span>
-      ${escapeHtml(c.name)}
-      <input type="number" min="0" value="${c.qty||0}" oninput="updateItemColorQty(${idx}, this.value)" onclick="event.stopPropagation()">
-      ${itemModalSaleType==='piece' ? `<input type="number" min="0" step="0.01" value="${c.price??''}" placeholder="السعر" title="سعر القطعة" oninput="updateItemColorPrice(${idx}, this.value)" onclick="event.stopPropagation()">` : ''}
-      <span class="cq-x" onclick="removeItemColorChip(${idx})">✕</span>
-    </span>
+    <div class="color-row">
+      <div class="color-row-top">
+        <span class="color-chip-thumb" style="${c.image ? `background-image:url('${c.image}')` : `background:${colorToHex(c.name)}`}" onclick="triggerColorImagePick(${idx})" title="إضافة/تغيير صورة اللون">
+          ${c.image ? `<span class="cq-img-x" onclick="event.stopPropagation(); removeColorImage(${idx})" title="إزالة صورة اللون">✕</span>` : '📷'}
+        </span>
+        <input type="text" class="cq-name" value="${escapeHtml(c.name)}" placeholder="اسم اللون" oninput="updateItemColorName(${idx}, this.value)">
+        <span class="cq-x" onclick="removeItemColorChip(${idx})" title="حذف">✕</span>
+      </div>
+      <div class="color-row-fields">
+        <label>الكمية
+          <input type="number" inputmode="numeric" min="0" value="${c.qty||0}" oninput="updateItemColorQty(${idx}, this.value)">
+        </label>
+        ${isPc ? `<label>سعر القطعة
+          <input type="number" inputmode="decimal" min="0" step="0.01" value="${c.price??''}" placeholder="السعر" oninput="updateItemColorPrice(${idx}, this.value)">
+        </label>` : ''}
+      </div>
+    </div>
   `).join('') : '<span class="page-sub" style="margin:0;">لم تتم إضافة أى لون بعد</span>';
+}
+function updateItemColorName(idx, val){
+  if(!itemColorsList[idx]) return;
+  itemColorsList[idx].name = val; /* التنظيف والتحقق من التكرار عند الحفظ */
 }
 function addItemColorChip(){
   const input = document.getElementById('itemColorInput');
@@ -1932,7 +1961,7 @@ function addItemColorChip(){
   const priceRaw = (itemModalSaleType==='piece' && priceInput) ? priceInput.value : '';
   const qty = qtyRaw==='' ? 0 : (Number(qtyRaw)||0);
   if(qtyRaw!=='') itemColorsManaged = true;
-  if(!itemColorsList.some(c=> c.name.toLowerCase()===val.toLowerCase())) itemColorsList.push({name: val, qty, image:'', price: priceRaw==='' ? '' : (Number(priceRaw)||0)});
+  if(!itemColorsList.some(c=> c.name.toLowerCase()===val.toLowerCase())) itemColorsList.push({name: val, orig: null, qty, image:'', price: priceRaw==='' ? '' : (Number(priceRaw)||0)});
   input.value = '';
   if(sizeInput) sizeInput.value = '';
   if(priceInput) priceInput.value = '';
@@ -2179,11 +2208,44 @@ function closeLightbox(e){
   document.getElementById('lightboxImg').src = '';
 }
 
+/* عند تغيير اسم لون: نحدّث اسمه في كل السجلات القديمة للصنف عشان الأرصدة والتقارير تفضل مظبوطة */
+function migrateColorNames(itemId, map){
+  const has = k=> Object.prototype.hasOwnProperty.call(map, k);
+  const ops = [];
+  const flat = (col, list)=> list.forEach(e=>{
+    if(e.itemId===itemId && has(e.color||'')) ops.push({ref: db.collection(col).doc(e.id), data:{color: map[e.color]}});
+  });
+  const nested = (col, list)=> list.forEach(tx=>{
+    if(!(tx.items||[]).some(it=> it.itemId===itemId && has(it.color||''))) return;
+    const newItems = tx.items.map(it=> (it.itemId===itemId && has(it.color||'')) ? {...it, color: map[it.color]} : it);
+    ops.push({ref: db.collection(col).doc(tx.id), data:{items: newItems}});
+  });
+  flat('saleEntries', saleEntries);
+  flat('stockReceipts', stockReceipts);
+  nested('merchantTransactions', merchantTxs);
+  nested('archivedMerchantTransactions', archivedMerchantTxs);
+  nested('orders', typeof orders!=='undefined' ? orders : []);
+  let chain = Promise.resolve();
+  for(let i=0;i<ops.length;i+=400){
+    const chunk = ops.slice(i,i+400);
+    chain = chain.then(()=>{ const b = db.batch(); chunk.forEach(o=> b.update(o.ref, o.data)); return b.commit(); });
+  }
+  return chain;
+}
+
 function saveItem(){
   const id = document.getElementById('itemId').value;
   const name = document.getElementById('itemName').value.trim();
   const category = document.getElementById('itemCategory').value.trim();
   const sku = document.getElementById('itemSku').value.trim();
+  itemColorsList.forEach(c=>{ c.name = String(c.name||'').trim(); });
+  if(itemColorsList.some(c=> !c.name)){ showToast('اسم اللون لا يمكن أن يكون فارغاً'); return; }
+  const _seen = new Set();
+  for(const c of itemColorsList){
+    const k = c.name.toLowerCase();
+    if(_seen.has(k)){ showToast('اللون "'+c.name+'" مكرر، غيّر أحد الاسمين'); return; }
+    _seen.add(k);
+  }
   const colors = itemColorsList.map(c=> c.name);
   const color = colors.join('، ');
   const colorImages = {};
@@ -2212,9 +2274,16 @@ function saveItem(){
        (تأثير على المتبقي لكل لون وعلى تقارير المبيعات بهذا اللون) */
     const oldColorNames = oldItem && Array.isArray(oldItem.colors) ? oldItem.colors : [];
     const newColorNames = colors;
+    const renameMap = {};
+    itemColorsList.forEach(c=>{ if(c.orig && c.orig!==c.name) renameMap[c.orig] = c.name; });
+    const renamedFrom = new Set(Object.keys(renameMap));
     const removedColorsWithHistory = oldColorNames.filter(oc=>
-      !newColorNames.includes(oc) && issuedQtyForColor(id, oc) > 0
+      !newColorNames.includes(oc) && !renamedFrom.has(oc) && issuedQtyForColor(id, oc) > 0
     );
+    if(renamedFrom.size){
+      const lines = Object.keys(renameMap).map(o=> '• '+o+'  ←  '+renameMap[o]).join('\n');
+      if(!confirm('سيتم تغيير اسم الألوان التالية:\n'+lines+'\n\nوسيتم تحديث الاسم تلقائياً في سجلات المبيعات والواردات والطلبات القديمة الخاصة بهذا الصنف. متابعة؟')) return;
+    }
     if(removedColorsWithHistory.length){
       const proceed = confirm(
         'الألوان التالية عليها مبيعات مسجلة سابقاً ولن تعود موجودة في الصنف بعد الحفظ:\n' +
@@ -2241,7 +2310,7 @@ function saveItem(){
     if(usingColorStock){
       itemColorsList.forEach(c=>{
         const adjColorRaw = Math.max(0, Number(c.qty)||0); // qty هنا = المتبقي الجديد للون (لا يقل عن صفر)
-        const issuedColor = issuedQtyForColor(id, c.name);
+        const issuedColor = issuedQtyForColor(id, (c.orig && c.orig!==c.name) ? c.orig : c.name);
         colorStock[c.name] = adjColorRaw + issuedColor;
       });
       if(adjRaw === '' || adjRaw === null){
@@ -2260,6 +2329,7 @@ function saveItem(){
     payload.pieces = pieces.length ? pieces : firebase.firestore.FieldValue.delete();
 
     db.collection('items').doc(id).update(payload)
+      .then(()=> Object.keys(renameMap).length ? migrateColorNames(id, renameMap) : null)
       .then(()=>{
         if(delta !== 0){
           logStockMovement({itemId:id, itemName:name, type: delta>0?'in':'out', qty: Math.abs(delta), date: today, note:'تعديل يدوي للرصيد الفعلي', sourceType:'manual', sourceId:id});
