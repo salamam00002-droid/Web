@@ -353,6 +353,14 @@
   .ds-calendar-day.ds-selected .ds-dot{background:#fff;}
   .link-btn{background:none; border:none; color:var(--gold-dark); font-weight:700; font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;}
   .category-chip{display:inline-block; background:var(--cream); border:1px solid var(--line); color:var(--muted); font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; margin-inline-end:6px;}
+  .color-add-row{display:flex; flex-wrap:wrap; gap:8px; align-items:stretch;}
+  .color-add-row input{flex:1 1 120px; min-width:0; width:auto; text-overflow:ellipsis;}
+  .color-add-row .color-add-btn{flex:0 0 auto; white-space:nowrap;}
+  @media(max-width:560px){
+    .color-add-row input{flex:1 1 calc(50% - 8px);}
+    #itemColorInput{flex-basis:100%;}
+    .color-add-row .color-add-btn{flex:1 1 100%; padding:10px 12px;}
+  }
   .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 6px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
   .color-qty-chip input{width:56px; padding:3px 6px; font-size:12px; border-radius:14px; text-align:center;}
   .color-qty-chip .cq-x{cursor:pointer; font-weight:800; color:var(--muted); padding:0 2px;}
@@ -1268,12 +1276,12 @@
         </div>
         <div class="field" style="grid-column:1 / -1;">
           <label id="itemColorsLabel">الألوان والكمية لكل لون (يمكن إضافة أكثر من لون)</label>
-          <div style="display:flex; gap:8px;">
-            <input id="itemColorInput" placeholder="مثال: روز" style="flex:1.4;" onkeydown="if(event.key==='Enter'){event.preventDefault(); const sz=document.getElementById('itemColorSizeInput'); (sz.style.display!=='none'?sz:document.getElementById('itemColorQtyInput')).focus();}">
-            <input id="itemColorSizeInput" placeholder="المقاس" style="flex:1; display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('itemColorQtyInput').focus();}">
-            <input id="itemColorQtyInput" type="number" min="0" placeholder="الكمية" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); const pr=document.getElementById('itemColorPriceInput'); if(pr.style.display!=='none') pr.focus(); else addItemColorChip();}">
-            <input id="itemColorPriceInput" type="number" min="0" step="0.01" placeholder="سعر القطعة" style="flex:1; display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addItemColorChip();}">
-            <button type="button" class="btn btn-outline btn-sm" onclick="addItemColorChip()">+ إضافة لون</button>
+          <div class="color-add-row">
+            <input id="itemColorInput" placeholder="مثال: روز" onkeydown="if(event.key==='Enter'){event.preventDefault(); const sz=document.getElementById('itemColorSizeInput'); (sz.style.display!=='none'?sz:document.getElementById('itemColorQtyInput')).focus();}">
+            <input id="itemColorSizeInput" placeholder="المقاس" style="display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('itemColorQtyInput').focus();}">
+            <input id="itemColorQtyInput" type="number" min="0" placeholder="الكمية" onkeydown="if(event.key==='Enter'){event.preventDefault(); const pr=document.getElementById('itemColorPriceInput'); if(pr.style.display!=='none') pr.focus(); else addItemColorChip();}">
+            <input id="itemColorPriceInput" type="number" min="0" step="0.01" placeholder="سعر القطعة" style="display:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addItemColorChip();}">
+            <button type="button" class="btn btn-outline btn-sm color-add-btn" onclick="addItemColorChip()">+ إضافة لون</button>
           </div>
           <div id="itemColorsChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
           <input type="file" id="itemColorImageFile" accept="image/*" style="display:none;" onchange="handleColorImageChange(event)">
@@ -1935,6 +1943,8 @@ function addItemColorChip(){
 }
 function removeItemColorChip(idx){
   const c = itemColorsList[idx];
+  if(!c) return;
+  if(!confirm('هل تريد حذف "'+c.name+'"؟'+(c.image?' (وصورته أيضاً)':''))) return;
   if(c && c.image) deleteStorageImageSilently(c.image);
   itemColorsList.splice(idx,1);
   renderItemColorsChips();
@@ -2011,6 +2021,7 @@ function deleteStorageImageSilently(url){
   storage.refFromURL(url).delete().catch(function(){ /* الملف ممكن يكون اتمسح خلاص، تجاهل الخطأ */ });
 }
 function removeItemImage(){
+  if(!confirm('هل تريد حذف صورة الصنف؟')) return;
   const oldUrl = document.getElementById('itemImageData').value;
   document.getElementById('itemImageFile').value = '';
   setItemImagePreview('');
@@ -2113,6 +2124,7 @@ function uploadColorImageBlob(idx, blob){
 }
 function removeColorImage(idx){
   if(!itemColorsList[idx]) return;
+  if(!confirm('هل تريد حذف صورة هذا اللون؟')) return;
   const oldUrl = itemColorsList[idx].image;
   itemColorsList[idx].image = '';
   deleteStorageImageSilently(oldUrl);
