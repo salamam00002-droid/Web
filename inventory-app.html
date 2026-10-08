@@ -1095,7 +1095,7 @@
       </div>
       <div style="margin-top:14px; display:flex; gap:10px; align-items:center;">
         <button class="btn btn-gold" onclick="saveSaleEntry()">💾 حفظ البيع</button>
-        <button class="btn btn-outline" onclick="resetSaleForm()">مسح</button>
+        <button class="btn btn-outline" onclick="if(confirm('هل تريد مسح البيانات المُدخلة في النموذج؟')) resetSaleForm()">مسح</button>
       </div>
     </div>
 
@@ -1157,7 +1157,7 @@
       </div>
       <div style="margin-top:14px; display:flex; gap:10px;">
         <button class="btn btn-gold" onclick="saveReceipt()">💾 حفظ الوارد</button>
-        <button class="btn btn-outline" onclick="resetReceiptForm()">مسح</button>
+        <button class="btn btn-outline" onclick="if(confirm('هل تريد مسح البيانات المُدخلة في النموذج؟')) resetReceiptForm()">مسح</button>
       </div>
     </div>
     <div class="ds-calendar ds-rc-only" style="display:none;">
@@ -3433,7 +3433,9 @@ function updateMerchantRowThumb(rowId, itemId){
 
 function removeMerchantItemRow(rowId){
   const el = document.getElementById(rowId);
-  if(el) el.remove();
+  if(!el) return;
+  if(!confirm('هل تريد حذف هذا الصنف من القائمة؟')) return;
+  el.remove();
   recalcMerchantTotals();
 }
 
