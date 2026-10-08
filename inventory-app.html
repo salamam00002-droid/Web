@@ -4048,49 +4048,71 @@ function renderDailySales(){
     return;
   }
 
-  /* تجميع الصفوف يوم بيوم، كل يوم في جدول مستقل ورا التاني */
-  const byDay = [];
-  rows.forEach(r=>{
-    let group = byDay.find(g=> g.date===r.date);
-    if(!group){ group = {date: r.date, items: []}; byDay.push(group); }
-    group.items.push(r);
-  });
+  /* تقسيم المبيعات حسب نوع الصنف: بالطقم / بالقطعة (الصنف المحذوف يُحسب بالطقم) */
+  const isPieceRow = r=>{ const it = items.find(i=> i.id===r.itemId); return !!(it && itemIsPiece(it)); };
+  const setRows = rows.filter(r=> !isPieceRow(r));
+  const pieceRows = rows.filter(isPieceRow);
 
-  container.innerHTML = byDay.map(group=>{
-    const dayTotalQty = group.items.reduce((s,r)=> s + (Number(r.qty)||0), 0);
-    const rowsHtml = group.items.map(r=>{
-      const item = items.find(i=> i.id===r.itemId);
-      const img = (item && item.colorImages && r.color && item.colorImages[r.color]) || (item && item.image) || '';
-      const thumbCell = img
-        ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
-        : `<div class="ds-thumb">📦</div>`;
-      const safeItemName = JSON.stringify(r.itemName||'').replace(/'/g, "&apos;");
-      const deleteCell = r.source==='sale'
-        ? `<button class="btn btn-danger btn-sm edit-action" onclick='deleteSaleEntry("${r.id}","${r.itemId}",${safeItemName},${r.qty},"${r.date}")'>🗑</button>`
-        : '';
+  /* داخل كل نوع: تجميع الصفوف يوم بيوم، كل يوم في جدول مستقل ورا التاني */
+  const renderDaysHtml = list=>{
+    const byDay = [];
+    list.forEach(r=>{
+      let group = byDay.find(g=> g.date===r.date);
+      if(!group){ group = {date: r.date, items: []}; byDay.push(group); }
+      group.items.push(r);
+    });
+    return byDay.map(group=>{
+      const dayTotalQty = group.items.reduce((s,r)=> s + (Number(r.qty)||0), 0);
+      const rowsHtml = group.items.map(r=>{
+        const item = items.find(i=> i.id===r.itemId);
+        const img = (item && item.colorImages && r.color && item.colorImages[r.color]) || (item && item.image) || '';
+        const thumbCell = img
+          ? `<div class="ds-thumb"><img src="${img}" alt="${escapeHtml(r.itemName)}" onclick="openLightbox('${img}')"></div>`
+          : `<div class="ds-thumb">📦</div>`;
+        const safeItemName = JSON.stringify(r.itemName||'').replace(/'/g, "&apos;");
+        const deleteCell = r.source==='sale'
+          ? `<button class="btn btn-danger btn-sm edit-action" onclick='deleteSaleEntry("${r.id}","${r.itemId}",${safeItemName},${r.qty},"${r.date}")'>🗑</button>`
+          : '';
+        return `
+        <tr>
+          <td>${escapeHtml(r.merchantName||'-')}</td>
+          <td>${escapeHtml(r.itemName)}</td>
+          <td>${escapeHtml(r.sku||'-')}</td>
+          <td>${escapeHtml(r.color||'-')}</td>
+          <td class="money">${fmt(r.qty)}</td>
+          <td>${thumbCell}</td>
+          <td>${deleteCell}</td>
+        </tr>`;
+      }).join('');
       return `
-      <tr>
-        <td>${escapeHtml(r.merchantName||'-')}</td>
-        <td>${escapeHtml(r.itemName)}</td>
-        <td>${escapeHtml(r.sku||'-')}</td>
-        <td>${escapeHtml(r.color||'-')}</td>
-        <td class="money">${fmt(r.qty)}</td>
-        <td>${thumbCell}</td>
-        <td>${deleteCell}</td>
-      </tr>`;
+      <div class="section-head" style="margin:18px 0 8px;">
+        <h2 style="font-size:14px;">📅 ${group.date ? fmtDate(group.date) : 'بدون تاريخ'}</h2>
+        <span class="page-sub" style="margin:0;">${fmt(dayTotalQty)} ${list===pieceRows?'قطعة':'طقم'} (${group.items.length} عملية)</span>
+      </div>
+      <div class="card" style="overflow-x:auto; margin-bottom:14px;">
+        <table>
+          <thead><tr><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th><th></th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
     }).join('');
+  };
+
+  const renderSection = (title, list, emptyMsg, unit)=>{
+    const totalQty = list.reduce((s,r)=> s + (Number(r.qty)||0), 0);
     return `
-    <div class="section-head" style="margin:18px 0 8px;">
-      <h2 style="font-size:14px;">📅 ${group.date ? fmtDate(group.date) : 'بدون تاريخ'}</h2>
-      <span class="page-sub" style="margin:0;">${fmt(dayTotalQty)} قطعة (${group.items.length} عملية)</span>
-    </div>
-    <div class="card" style="overflow-x:auto; margin-bottom:14px;">
-      <table>
-        <thead><tr><th>التاجر</th><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>الصورة</th><th></th></tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+    <div class="ds-type-section" style="margin-top:22px;">
+      <div class="section-head" style="margin:0 0 4px; padding:10px 12px; background:var(--cream); border:1px solid var(--line); border-radius:12px;">
+        <h2 style="font-size:16px;">${title}</h2>
+        <span class="page-sub" style="margin:0;">${fmt(totalQty)} ${unit} (${list.length} عملية)</span>
+      </div>
+      ${list.length ? renderDaysHtml(list) : `<div class="card"><div class="empty">${emptyMsg}</div></div>`}
     </div>`;
-  }).join('');
+  };
+
+  container.innerHTML =
+    renderSection('🧳 مبيعات بالطقم', setRows, 'لا توجد مبيعات بالطقم في الفترة المحددة.', 'طقم')
+    + renderSection('🧩 مبيعات بالقطعة', pieceRows, 'لا توجد مبيعات بالقطعة في الفترة المحددة.', 'قطعة');
 
   currentDailySalesExport = {titleText, rows};
   renderDsCalendarGrid();
