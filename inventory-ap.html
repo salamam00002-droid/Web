@@ -1067,7 +1067,7 @@
 
     <div class="card" style="overflow-x:auto;">
       <table id="movementsTable">
-        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th class="mv-size-col">المقاس</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th><th></th></tr></thead>
+        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th class="mv-size-col">المقاس</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th><th id="movDelTh" style="display:none;"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -1643,9 +1643,11 @@ function setConnStatus(online){
 }
 
 /* ===================== NAV ===================== */
+let movDeleteEnabled = false; /* زر حذف الحركة متاح فقط عند الدخول لسجل الحركة من كارت الصنف */
 document.getElementById('mainNav').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-view]');
   if(!btn) return;
+  movDeleteEnabled = false;
   switchView(btn.dataset.view);
 });
 
@@ -2636,12 +2638,14 @@ function openItemArchiveModal(type){
 
 /* الانتقال لسجل الحركة مع فلترة على صنف معين */
 function viewItemMovements(itemId, itemName){
+  movDeleteEnabled = true;
   switchView('movements');
   const filterInput = document.getElementById('movFilterItem');
   if(filterInput) filterInput.value = itemName;
   renderMovements();
 }
 function clearMovementFilters(){
+  movDeleteEnabled = false;
   ['movFilterItem','movFilterType','movFilterFrom','movFilterTo'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.value = '';
@@ -2903,8 +2907,11 @@ function listenToStockMovements(){
 function renderMovements(){
   const tbody = document.querySelector('#movementsTable tbody');
   if(!tbody) return;
+  const delTh = document.getElementById('movDelTh');
+  if(delTh) delTh.style.display = movDeleteEnabled ? '' : 'none';
+  const cols = movDeleteEnabled ? 8 : 7;
   if(stockMovements.length===0){
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
     return;
   }
   const itemFilter = (document.getElementById('movFilterItem')?.value||'').trim().toLowerCase();
@@ -2921,7 +2928,7 @@ function renderMovements(){
   });
 
   if(filtered.length===0){
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
     return;
   }
   /* الحركات القديمة ما كانش فيها لون: نجيبه من الوارد/البيع المرتبط بيها */
@@ -2942,7 +2949,7 @@ function renderMovements(){
       <td>${m.type==='in' ? '<span class="pill paid">إضافة</span>' : '<span class="pill unpaid">خصم</span>'}</td>
       <td class="money">${m.type==='in'?'+':'-'}${fmt(m.qty)}</td>
       <td>${escapeHtml(m.note||'')}</td>
-      <td><button class="btn btn-danger btn-sm edit-action" onclick="deleteMovement('${m.id}')">🗑</button></td>
+      ${movDeleteEnabled ? `<td><button class="btn btn-danger btn-sm edit-action" onclick="deleteMovement('${m.id}')">🗑</button></td>` : ''}
     </tr>`;}).join('');
 }
 
