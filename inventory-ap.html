@@ -1067,7 +1067,7 @@
 
     <div class="card" style="overflow-x:auto;">
       <table id="movementsTable">
-        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th class="mv-size-col">المقاس</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
+        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th class="mv-size-col">المقاس</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -2904,7 +2904,7 @@ function renderMovements(){
   const tbody = document.querySelector('#movementsTable tbody');
   if(!tbody) return;
   if(stockMovements.length===0){
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
     return;
   }
   const itemFilter = (document.getElementById('movFilterItem')?.value||'').trim().toLowerCase();
@@ -2921,7 +2921,7 @@ function renderMovements(){
   });
 
   if(filtered.length===0){
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
     return;
   }
   /* الحركات القديمة ما كانش فيها لون: نجيبه من الوارد/البيع المرتبط بيها */
@@ -2942,6 +2942,7 @@ function renderMovements(){
       <td>${m.type==='in' ? '<span class="pill paid">إضافة</span>' : '<span class="pill unpaid">خصم</span>'}</td>
       <td class="money">${m.type==='in'?'+':'-'}${fmt(m.qty)}</td>
       <td>${escapeHtml(m.note||'')}</td>
+      <td><button class="btn btn-danger btn-sm edit-action" onclick="deleteMovement('${m.id}')">🗑</button></td>
     </tr>`;}).join('');
 }
 
@@ -3914,9 +3915,38 @@ function saveReceipt(){
     }).then(ref=> logStockMovement({itemId:it.id, itemName:label, type:'in', qty:l.qty, date, note:'وارد'+(supplier?' من '+supplier:'')+(note?' — '+note:''), sourceType:'receipt', sourceId:ref.id, color}));
   })).then(()=>{ showToast('تم حفظ الوارد'); resetReceiptForm(); }).catch(e=> showToast('خطأ: '+e.message));
 }
-function deleteReceipt(id){
-  if(!confirm('حذف الوارد ده؟ هيتخصم من المخزون الحالي.')) return;
+function deleteReceipt(id, legacy){
+  if(legacy){
+    const m = stockMovements.find(x=>x.id===id);
+    const desc = m ? `"${m.itemName||''}" — كمية ${fmt(m.qty)} بتاريخ ${fmtDate(m.date)}` : 'هذه العملية';
+    if(!confirm(`⚠️ تحذير: حذف عملية من سجل الوارد\n\n${desc}\n\nهذه عملية رصيد افتتاحي / تعديل يدوي مسجلة في سجل الحركة. الحذف هنا يمسحها من سجل الوارد وسجل الحركة فقط، ولن يغيّر رصيد المخزون الحالي.\n\nلا يمكن التراجع عن الحذف. هل أنت متأكد؟`)) return;
+    db.collection('stockMovements').doc(id).delete().then(()=> showToast('تم حذف العملية من السجل')).catch(e=> showToast('خطأ: '+e.message));
+    return;
+  }
+  const r = stockReceipts.find(x=>x.id===id);
+  const desc = r ? `"${r.itemName||''}"${r.color?' ('+r.color+')':''} — كمية ${fmt(r.qty)} بتاريخ ${fmtDate(r.date)}` : 'هذا الوارد';
+  if(!confirm(`⚠️ تحذير: حذف عملية وارد\n\n${desc}\n\nسيتم حذفها من سجل الوارد ومن سجل الحركة، وسيتم خصم هذه الكمية من المخزون الحالي.\n\nلا يمكن التراجع عن الحذف. هل أنت متأكد؟`)) return;
   db.collection('stockReceipts').doc(id).delete().then(()=> deleteMovementsBySource(id)).then(()=> showToast('تم حذف الوارد')).catch(e=> showToast('خطأ: '+e.message));
+}
+/* حذف عملية من سجل الحركة — التأثير على المخزون حسب نوع العملية */
+function deleteMovement(id){
+  const m = stockMovements.find(x=>x.id===id);
+  if(!m){ showToast('تعذر إيجاد الحركة'); return; }
+  const desc = `"${m.itemName||''}" — ${m.type==='in'?'إضافة':'خصم'} ${fmt(m.qty)} بتاريخ ${fmtDate(m.date)}`;
+  const tail = '\n\nلا يمكن التراجع عن الحذف. هل أنت متأكد؟';
+  const receipt = m.sourceType==='receipt' ? stockReceipts.find(x=>x.id===m.sourceId) : null;
+  const sale = m.sourceType==='sale' ? saleEntries.find(x=>x.id===m.sourceId) : null;
+  const fail = e=> showToast('خطأ: '+e.message);
+  if(receipt){
+    if(!confirm(`⚠️ تحذير: حذف حركة وارد\n\n${desc}\n\nهذه الحركة مرتبطة بعملية وارد. سيتم حذف الوارد نفسه من قسم المبيعات والواردات، وسيتم خصم هذه الكمية من المخزون الحالي.${tail}`)) return;
+    db.collection('stockReceipts').doc(receipt.id).delete().then(()=> deleteMovementsBySource(receipt.id)).then(()=> showToast('تم حذف الوارد والحركة')).catch(fail);
+  } else if(sale){
+    if(!confirm(`⚠️ تحذير: حذف حركة بيع\n\n${desc}\n\nهذه الحركة مرتبطة بعملية بيع. سيتم حذف عملية البيع نفسها من قسم المبيعات والواردات، وسيتم إرجاع الكمية إلى المخزون.${tail}`)) return;
+    db.collection('saleEntries').doc(sale.id).delete().then(()=> deleteMovementsBySource(sale.id)).then(()=> showToast('تم حذف عملية البيع والحركة')).catch(fail);
+  } else {
+    if(!confirm(`⚠️ تحذير: حذف حركة من السجل\n\n${desc}\n\nسيتم حذف هذا السطر من سجل الحركة فقط، ولن يتغير رصيد المخزون الحالي.${tail}`)) return;
+    db.collection('stockMovements').doc(id).delete().then(()=> showToast('تم حذف الحركة من السجل')).catch(fail);
+  }
 }
 /* الوارد القديم (رصيد افتتاحي + تعديل يدوي بالزيادة) من سجل الحركة، للعرض والطباعة فقط — بدون أي تأثير على المخزون.
    بنستبعد حركات الوارد الجديد (sourceType=receipt) وإلغاء البيع عشان ما يتكررش */
@@ -4000,7 +4030,7 @@ function renderReceipts(){
         const img = (it && it.colorImages && r.color && it.colorImages[r.color]) || (it && it.image) || '';
         const th = img ? `<div class="ds-thumb"><img src="${img}" alt="" onclick="openLightbox('${img}')"></div>` : '<div class="ds-thumb">📦</div>';
         const v = variantParts(r.itemId, r.color, r.size);
-        return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(v.color||'-')}</td>${isPc?`<td>${escapeHtml(v.size||'-')}</td>`:''}<td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${escapeHtml(r.note||'-')}</td><td>${th}</td><td>${r.legacy?'':`<button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}')">🗑</button>`}</td></tr>`;
+        return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(v.color||'-')}</td>${isPc?`<td>${escapeHtml(v.size||'-')}</td>`:''}<td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${escapeHtml(r.note||'-')}</td><td>${th}</td><td><button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}'${r.legacy?',true':''})">🗑</button></td></tr>`;
       }).join('');
       return `<div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">📅 ${g.date?fmtDate(g.date):'بدون تاريخ'}</h2><span class="page-sub" style="margin:0;">${fmt(tot)} ${unit} (${g.items.length} بند)</span></div>
       <div class="card" style="overflow-x:auto; margin-bottom:14px;"><table><thead><tr><th>الصنف</th><th>الكود</th><th>اللون</th>${isPc?'<th>المقاس</th>':''}<th>الكمية</th><th>المورد</th><th>ملاحظة</th><th>الصورة</th><th></th></tr></thead><tbody>${trs}</tbody></table></div>`;
