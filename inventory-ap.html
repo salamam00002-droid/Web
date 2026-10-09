@@ -255,6 +255,7 @@
   .call-btn svg{width:14px; height:14px; fill:#fff; display:block;}
   .phone-inline{display:inline-flex; align-items:center; gap:6px; vertical-align:middle; flex-wrap:wrap;}
   @media print{.wa-btn,.call-btn{display:none !important;}}
+  #movementsTable .mv-size-inline{display:none;}
   .merchant-card .m-row{
     display:flex; justify-content:space-between; align-items:center; font-size:13.5px;
     padding:7px 0; border-top:1px dashed var(--line);
@@ -666,6 +667,9 @@
 
     /* ---- الجداول: تمرير أفقي سلس وخط أصغر ---- */
     table, table *{font-size:12px !important;}
+    /* سجل الحركة: دمج اللون والمقاس في عمود واحد على الموبايل */
+    #movementsTable .mv-size-col{display:none;}
+    #movementsTable .mv-size-inline{display:inline;}
     th{padding:6px 6px;}
     td{padding:7px 6px;}
     .merchant-history-table{font-size:11.5px;}
@@ -1063,7 +1067,7 @@
 
     <div class="card" style="overflow-x:auto;">
       <table id="movementsTable">
-        <thead><tr><th>التاريخ</th><th>الصنف</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
+        <thead><tr><th>التاريخ</th><th>الصنف</th><th>اللون</th><th class="mv-size-col">المقاس</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -1745,6 +1749,16 @@ function itemCreatedDateStr(item){
 /* ميزة "تفاصيل القطع داخل الطقم" اتلغت: الأطقم بتتباع بالطقم بس، والقطع ليها قسم أصناف مستقل (saleType:'piece').
    البيانات القديمة (item.pieces / سجلات pieceId) فضلت محفوظة وبتتحسب زي الأول عشان الأرصدة ما تتغيرش. */
 function itemHasPieces(item){ return false; }
+/* الصنف بالقطعة بيخزّن (اللون + المقاس) في اسم متغيّر واحد بصيغة "لون — مقاس"؛ هنا بنفصلهم للعرض فقط */
+function splitColorSize(c){
+  const str = (c||'').toString(), i = str.indexOf(' — ');
+  return i<0 ? {color:str.trim(), size:''} : {color:str.slice(0,i).trim(), size:str.slice(i+3).trim()};
+}
+function variantParts(itemId, colorStr, sizeStr){
+  const it = (typeof items!=='undefined' && Array.isArray(items)) ? items.find(i=>i.id===itemId) : null;
+  if(it && itemIsPiece(it)){ const p = splitColorSize(colorStr); return {color:p.color, size: sizeStr || p.size}; }
+  return {color:(colorStr||'').toString(), size: sizeStr||''};
+}
 function pieceLabel(item, piece){ return piece ? (item.name+' — '+piece.name+(piece.size?' ('+piece.size+')':'')) : (item?item.name:''); }
 function _issuedSplit(itemId, color){
   let full = 0; const per = {};
@@ -2841,12 +2855,12 @@ function escapeHtml(s){
 }
 
 /* ===================== STOCK MOVEMENTS: FIRESTORE ===================== */
-function logStockMovement({itemId, itemName, type, qty, date, note, sourceType, sourceId}){
+function logStockMovement({itemId, itemName, type, qty, date, note, sourceType, sourceId, color}){
   if(!db) return;
   db.collection('stockMovements').add({
     itemId: itemId||'', itemName: itemName||'', type, qty: Number(qty)||0,
     date: date || new Date().toISOString().slice(0,10),
-    note: note||'', sourceType: sourceType||'', sourceId: sourceId||'',
+    note: note||'', sourceType: sourceType||'', sourceId: sourceId||'', color: color||'',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).catch(e=> console.error('movement log error', e));
 }
@@ -2873,7 +2887,7 @@ function renderMovements(){
   const tbody = document.querySelector('#movementsTable tbody');
   if(!tbody) return;
   if(stockMovements.length===0){
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="big">📋</div>لا توجد حركات مسجلة بعد.</div></td></tr>`;
     return;
   }
   const itemFilter = (document.getElementById('movFilterItem')?.value||'').trim().toLowerCase();
@@ -2890,17 +2904,28 @@ function renderMovements(){
   });
 
   if(filtered.length===0){
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="big">🔍</div>لا توجد حركات مطابقة لبحثك.</div></td></tr>`;
     return;
   }
-  tbody.innerHTML = filtered.map(m=>`
+  /* الحركات القديمة ما كانش فيها لون: نجيبه من الوارد/البيع المرتبط بيها */
+  const movColor = m=>{
+    if(m.color) return m.color;
+    if(m.sourceType==='receipt'){ const r = stockReceipts.find(x=>x.id===m.sourceId); if(r) return r.color||''; }
+    if(m.sourceType==='sale'){ const r = saleEntries.find(x=>x.id===m.sourceId); if(r) return r.color||''; }
+    return '';
+  };
+  tbody.innerHTML = filtered.map(m=>{
+    const v = variantParts(m.itemId, movColor(m));
+    return `
     <tr>
       <td>${fmtDate(m.date)}</td>
       <td>${escapeHtml(m.itemName)}</td>
+      <td>${escapeHtml(v.color||'-')}${v.size?`<span class="mv-size-inline"> · ${escapeHtml(v.size)}</span>`:''}</td>
+      <td class="mv-size-col">${escapeHtml(v.size||'-')}</td>
       <td>${m.type==='in' ? '<span class="pill paid">إضافة</span>' : '<span class="pill unpaid">خصم</span>'}</td>
       <td class="money">${m.type==='in'?'+':'-'}${fmt(m.qty)}</td>
       <td>${escapeHtml(m.note||'')}</td>
-    </tr>`).join('');
+    </tr>`;}).join('');
 }
 
 /* ===================== MERCHANTS: FIRESTORE ===================== */
@@ -3290,7 +3315,7 @@ function saveSalePieces(c){
       ...(r.piece ? {pieceId:r.piece.id, pieceName:r.piece.name, size:r.piece.size||''} : {}),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()};
     return db.collection('saleEntries').add(payload).then(ref=>{
-      logStockMovement({itemId:itemObj.id, itemName:label, type:'out', qty:r.qty, date:dateVal, note:'بيع للتاجر: '+mName, sourceType:'sale', sourceId:ref.id});
+      logStockMovement({itemId:itemObj.id, itemName:label, type:'out', qty:r.qty, date:dateVal, note:'بيع للتاجر: '+mName, sourceType:'sale', sourceId:ref.id, color});
     });
   })).then(()=>{ showToast('تم حفظ البيع بنجاح'); resetSaleForm(); }).catch(e=> showToast('خطأ: '+e.message));
 }
@@ -3429,7 +3454,7 @@ function saveSaleEntry(){
   db.collection('saleEntries').add(payload).then(ref=>{
     logStockMovement({
       itemId, itemName: itemObj?itemObj.name:'', type:'out', qty, date: today,
-      note: 'بيع للتاجر: '+(merchantProfile?merchantProfile.name:''), sourceType:'sale', sourceId: ref.id
+      note: 'بيع للتاجر: '+(merchantProfile?merchantProfile.name:''), sourceType:'sale', sourceId: ref.id, color
     });
     showToast('تم حفظ البيع بنجاح');
     resetSaleForm();
@@ -3438,8 +3463,10 @@ function saveSaleEntry(){
 
 function deleteSaleEntry(id, itemId, itemName, qty, date){
   if(!confirm('هل تريد حذف هذه العملية؟ سيتم استعادة الكمية للمخزون.')) return;
+  const _se = saleEntries.find(x=>x.id===id);
+  const _seColor = (_se && _se.color) || '';
   db.collection('saleEntries').doc(id).delete().then(()=>{
-    logStockMovement({itemId, itemName, type:'in', qty, date, note:'إلغاء بيع', sourceType:'sale_cancel', sourceId:id});
+    logStockMovement({itemId, itemName, type:'in', qty, date, note:'إلغاء بيع', sourceType:'sale_cancel', sourceId:id, color:_seColor});
     showToast('تم حذف العملية');
   }).catch(e=> showToast('خطأ: '+e.message));
 }
@@ -3779,7 +3806,7 @@ function listenToStockReceipts(){
   db.collection('stockReceipts').orderBy('date','desc').onSnapshot(snap=>{
     stockReceipts = [];
     snap.forEach(doc=> stockReceipts.push({id: doc.id, ...doc.data()}));
-    renderReceipts(); renderDashboard(); renderItems(); renderRemainingStock(); updateNotifications(); refreshSaleColors();
+    renderReceipts(); renderMovements(); renderDashboard(); renderItems(); renderRemainingStock(); updateNotifications(); refreshSaleColors();
   }, err=> showToast('خطأ في قراءة الوارد: '+err.message));
 }
 function setDsTab(tab){
@@ -3867,7 +3894,7 @@ function saveReceipt(){
       date, itemId:it.id, itemName:label, sku:it.sku||'', color, qty:l.qty, supplier, note,
       ...(l.piece ? {pieceId:l.piece.id, pieceName:l.piece.name, size:l.piece.size||''} : {}),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(ref=> logStockMovement({itemId:it.id, itemName:label, type:'in', qty:l.qty, date, note:'وارد'+(supplier?' من '+supplier:'')+(note?' — '+note:''), sourceType:'receipt', sourceId:ref.id}));
+    }).then(ref=> logStockMovement({itemId:it.id, itemName:label, type:'in', qty:l.qty, date, note:'وارد'+(supplier?' من '+supplier:'')+(note?' — '+note:''), sourceType:'receipt', sourceId:ref.id, color}));
   })).then(()=>{ showToast('تم حفظ الوارد'); resetReceiptForm(); }).catch(e=> showToast('خطأ: '+e.message));
 }
 function deleteReceipt(id){
@@ -3946,7 +3973,7 @@ function renderReceipts(){
   const pieceRows = rows.filter(isPieceRow);
 
   /* داخل كل نوع: تجميع الصفوف يوم بيوم، كل يوم في جدول مستقل */
-  const renderDaysHtml = (list, unit)=>{
+  const renderDaysHtml = (list, unit, isPc)=>{
     const byDay = [];
     list.forEach(r=>{ let g = byDay.find(x=>x.date===r.date); if(!g){ g={date:r.date, items:[]}; byDay.push(g); } g.items.push(r); });
     return byDay.map(g=>{
@@ -3955,10 +3982,11 @@ function renderReceipts(){
         const it = items.find(i=>i.id===r.itemId);
         const img = (it && it.colorImages && r.color && it.colorImages[r.color]) || (it && it.image) || '';
         const th = img ? `<div class="ds-thumb"><img src="${img}" alt="" onclick="openLightbox('${img}')"></div>` : '<div class="ds-thumb">📦</div>';
-        return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(r.color||'-')}</td><td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${escapeHtml(r.note||'-')}</td><td>${th}</td><td>${r.legacy?'':`<button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}')">🗑</button>`}</td></tr>`;
+        const v = variantParts(r.itemId, r.color, r.size);
+        return `<tr><td>${escapeHtml(r.itemName)}</td><td>${escapeHtml(r.sku||'-')}</td><td>${escapeHtml(v.color||'-')}</td>${isPc?`<td>${escapeHtml(v.size||'-')}</td>`:''}<td class="money">${fmt(r.qty)}</td><td>${escapeHtml(r.supplier||'-')}</td><td>${escapeHtml(r.note||'-')}</td><td>${th}</td><td>${r.legacy?'':`<button class="btn btn-danger btn-sm edit-action" onclick="deleteReceipt('${r.id}')">🗑</button>`}</td></tr>`;
       }).join('');
       return `<div class="section-head" style="margin:18px 0 8px;"><h2 style="font-size:14px;">📅 ${g.date?fmtDate(g.date):'بدون تاريخ'}</h2><span class="page-sub" style="margin:0;">${fmt(tot)} ${unit} (${g.items.length} بند)</span></div>
-      <div class="card" style="overflow-x:auto; margin-bottom:14px;"><table><thead><tr><th>الصنف</th><th>الكود</th><th>اللون</th><th>الكمية</th><th>المورد</th><th>ملاحظة</th><th>الصورة</th><th></th></tr></thead><tbody>${trs}</tbody></table></div>`;
+      <div class="card" style="overflow-x:auto; margin-bottom:14px;"><table><thead><tr><th>الصنف</th><th>الكود</th><th>اللون</th>${isPc?'<th>المقاس</th>':''}<th>الكمية</th><th>المورد</th><th>ملاحظة</th><th>الصورة</th><th></th></tr></thead><tbody>${trs}</tbody></table></div>`;
     }).join('');
   };
 
@@ -3970,7 +3998,7 @@ function renderReceipts(){
         <h2 style="font-size:16px;">${title}</h2>
         <span class="page-sub" style="margin:0;">${fmt(totalQty)} ${unit} (${list.length} بند)</span>
       </div>
-      ${list.length ? renderDaysHtml(list, unit) : `<div class="card"><div class="empty">${emptyMsg}</div></div>`}
+      ${list.length ? renderDaysHtml(list, unit, unit==='قطعة') : `<div class="card"><div class="empty">${emptyMsg}</div></div>`}
     </div>`;
   };
 
@@ -3981,8 +4009,8 @@ function renderReceipts(){
 function exportReceiptsCsv(){
   const x = currentReceiptsExport;
   if(!x || !x.rows.length){ showToast('لا يوجد وارد لتصديره'); return; }
-  const rows = [['الوارد اليومي'], [x.title], [], ['التاريخ','الصنف','الكود','اللون','الكمية','المورد','ملاحظة']];
-  x.rows.forEach(r=> rows.push([r.date?fmtDate(r.date):'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.supplier||'-', r.note||'-']));
+  const rows = [['الوارد اليومي'], [x.title], [], ['التاريخ','الصنف','الكود','اللون','المقاس','الكمية','المورد','ملاحظة']];
+  x.rows.forEach(r=>{ const v = variantParts(r.itemId, r.color, r.size); rows.push([r.date?fmtDate(r.date):'-', r.itemName, r.sku||'-', v.color||'-', v.size||'-', r.qty, r.supplier||'-', r.note||'-']); });
   downloadCsv('الوارد اليومي.csv', rows);
 }
 
@@ -4259,26 +4287,14 @@ function exportDailySalesCsv(){
   downloadCsv('المبيعات اليومية.csv', rows);
 }
 
-async function exportDailySalesXlsx(){
-  if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
-  const s = currentDailySalesExport;
-  const rows = [['المبيعات اليومية']];
-  rows.push([s.titleText||'']);
+/* ينشئ ورقة Excel بنفس التنسيق المعتمد (عنوان + فترة + جدول بحدود وتظليل + صف إجمالي) */
+function addStyledXlsxSheet(wb, sheetName, title, subtitle, header, dataRows, totalRowData){
+  const rows = [[title], [subtitle||''], [], header];
+  dataRows.forEach(r=> rows.push(r));
   rows.push([]);
-  rows.push(['التاريخ','التاجر','الصنف','الكود','اللون','الكمية','السعر','الإجمالي']);
-  s.rows.forEach(r=>{
-    rows.push([r.date ? fmtDate(r.date) : '-', r.merchantName||'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.price, (Number(r.qty)||0)*(Number(r.price)||0)]);
-  });
-
-  /* حساب إجمالي المبيعات */
-  const grandTotal = s.rows.reduce((sum, r) => sum + (Number(r.qty)||0)*(Number(r.price)||0), 0);
-  /* إضافة صف فارغ ثم صف الإجمالي */
-  rows.push([]);
-  const totalRowData = ['','','','','','','الإجمالي', grandTotal];
   rows.push(totalRowData);
 
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('المبيعات اليومية');
+  const ws = wb.addWorksheet(sheetName);
   ws.views = [{ rightToLeft: true }];
   rows.forEach(r=> ws.addRow(r));
 
@@ -4343,124 +4359,69 @@ async function exportDailySalesXlsx(){
   }
 
   /* تنسيق صف الإجمالي (آخر صف) */
-  const totalRowNum = ws.rowCount;
-  const totalRow = ws.getRow(totalRowNum);
+  const totalRow = ws.getRow(ws.rowCount);
   totalRow.eachCell({includeEmpty:true}, cell => {
-    cell.font = { bold: true, size: 12 };
     cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B2A4A'} };
     cell.font = { bold: true, size: 12, color: {argb:'FFFFFFFF'} };
     cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
-
+  return ws;
+}
+async function downloadXlsxWorkbook(wb, filename){
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'المبيعات اليومية.xlsx';
+  a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+/* الصنف المحذوف يُحسب بالطقم - نفس منطق العرض على الشاشة */
+function isPieceExportRow(r){ const it = items.find(i=> i.id===r.itemId); return !!(it && itemIsPiece(it)); }
+
+async function exportDailySalesXlsx(){
+  if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
+  const s = currentDailySalesExport;
+  const header = ['التاريخ','التاجر','الصنف','الكود','اللون','الكمية','السعر','الإجمالي'];
+  const groups = [
+    {sheet:'مبيعات بالطقم',  title:'المبيعات اليومية — مبيعات بالطقم',  list: s.rows.filter(r=> !isPieceExportRow(r))},
+    {sheet:'مبيعات بالقطعة', title:'المبيعات اليومية — مبيعات بالقطعة', list: s.rows.filter(isPieceExportRow)}
+  ];
+  const wb = new ExcelJS.Workbook();
+  groups.forEach(g=>{
+    if(!g.list.length) return;
+    const data = g.list.map(r=> [r.date ? fmtDate(r.date) : '-', r.merchantName||'-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.price, (Number(r.qty)||0)*(Number(r.price)||0)]);
+    const grandTotal = g.list.reduce((sum, r)=> sum + (Number(r.qty)||0)*(Number(r.price)||0), 0);
+    addStyledXlsxSheet(wb, g.sheet, g.title, s.titleText||'', header, data, ['','','','','','','الإجمالي', grandTotal]);
+  });
+  await downloadXlsxWorkbook(wb, 'المبيعات اليومية.xlsx');
 }
 
 async function exportReceiptsXlsx(){
   if(!currentReceiptsExport || currentReceiptsExport.rows.length===0){ showToast('لا يوجد وارد لتصديره'); return; }
   const s = currentReceiptsExport;
-  const rows = [['الوارد اليومي']];
-  rows.push([s.title||'']);
-  rows.push([]);
-  rows.push(['التاريخ','الصنف','الكود','اللون','الكمية','المورد','ملاحظة']);
-  s.rows.forEach(r=>{
-    rows.push([r.date ? fmtDate(r.date) : '-', r.itemName, r.sku||'-', r.color||'-', r.qty, r.supplier||'-', (r.note||'-')]);
-  });
-
-  /* إجمالي الكمية الواردة */
-  const grandTotal = s.rows.reduce((sum, r) => sum + (Number(r.qty)||0), 0);
-  rows.push([]);
-  rows.push(['','','','الإجمالي', grandTotal,'','']);
-
+  /* جدول الطقم: بدون عمود مقاس — جدول القطعة: فيه عمود المقاس (زي الشاشة) */
+  const groups = [
+    {sheet:'وارد بالطقم',  title:'الوارد اليومي — وارد بالطقم',  isPc:false, list: s.rows.filter(r=> !isPieceExportRow(r))},
+    {sheet:'وارد بالقطعة', title:'الوارد اليومي — وارد بالقطعة', isPc:true,  list: s.rows.filter(isPieceExportRow)}
+  ];
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('الوارد اليومي');
-  ws.views = [{ rightToLeft: true }];
-  rows.forEach(r=> ws.addRow(r));
-
-  const colCount = Math.max(...rows.map(r=>r.length));
-  const headerRowNum = 4;
-  /* دمج صفي العنوان والفترة عبر كل الأعمدة حتى لا يحسبا ضمن عرض عمود التاريخ */
-  ws.mergeCells(1,1,1,colCount);
-  ws.mergeCells(2,1,2,colCount);
-  ws.getCell(1,1).font = { bold:true, size:13 };
-  ws.getCell(2,1).font = { size:11 };
-
-  /* عرض الأعمدة يُحسب من صف العناوين وصفوف البيانات فقط، بدون صفي العنوان المدموجين */
-  const widthRows = rows.slice(headerRowNum-1);
-  for(let i=1; i<=colCount; i++){
-    let maxLen = 8;
-    widthRows.forEach(r=>{
-      const v = r[i-1];
-      const len = (v===null||v===undefined) ? 0 : String(v).length;
-      if(len>maxLen) maxLen = len;
+  groups.forEach(g=>{
+    if(!g.list.length) return;
+    const header = g.isPc
+      ? ['التاريخ','الصنف','الكود','اللون','المقاس','الكمية','المورد','ملاحظة']
+      : ['التاريخ','الصنف','الكود','اللون','الكمية','المورد','ملاحظة'];
+    const data = g.list.map(r=>{
+      const v = variantParts(r.itemId, r.color, r.size);
+      return g.isPc
+        ? [r.date ? fmtDate(r.date) : '-', r.itemName, r.sku||'-', v.color||'-', v.size||'-', r.qty, r.supplier||'-', (r.note||'-')]
+        : [r.date ? fmtDate(r.date) : '-', r.itemName, r.sku||'-', v.color||'-', r.qty, r.supplier||'-', (r.note||'-')];
     });
-    ws.getColumn(i).width = Math.min(30, maxLen+2);
-  }
-
-  /* إعداد الصفحة للطباعة بورتريه مع احتواء كل الأعمدة في عرض الصفحة */
-  ws.pageSetup = {
-    orientation: 'portrait',
-    fitToPage: true,
-    fitToWidth: 1,
-    fitToHeight: 0,
-    horizontalCentered: true,
-    margins: { left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.2, footer:0.2 }
-  };
-
-  ws.eachRow(row=>{
-    row.eachCell({includeEmpty:true}, cell=>{
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    });
+    const grandTotal = g.list.reduce((sum, r)=> sum + (Number(r.qty)||0), 0);
+    addStyledXlsxSheet(wb, g.sheet, g.title, s.title||'', header, data, g.isPc ? ['','','','','الإجمالي', grandTotal,'',''] : ['','','','الإجمالي', grandTotal,'','']);
   });
-
-  /* حدود واضحة حوالين كل خلايا الجدول (من صف العناوين لآخر صف بيانات) */
-  const thinBorder = { style:'thin', color:{argb:'FF000000'} };
-  for(let r = headerRowNum; r <= ws.rowCount; r++){
-    ws.getRow(r).eachCell({includeEmpty:true}, cell=>{
-      cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
-    });
-  }
-  /* تظليل وتغميق صف العناوين */
-  ws.getRow(headerRowNum).eachCell({includeEmpty:true}, cell=>{
-    cell.font = { bold:true };
-    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8E8E8'} };
-  });
-
-  /* تظليل خفيف بالتبادل لصفوف البيانات (سطر مظلل وسطر لأ) لسهولة القراءة */
-  let stripeIndex = 0;
-  for(let r = headerRowNum+1; r <= ws.rowCount; r++){
-    if(stripeIndex % 2 === 0){
-      ws.getRow(r).eachCell({includeEmpty:true}, cell=>{
-        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} };
-      });
-    }
-    stripeIndex++;
-  }
-
-  /* تنسيق صف الإجمالي (آخر صف) */
-  const totalRowNum = ws.rowCount;
-  const totalRow = ws.getRow(totalRowNum);
-  totalRow.eachCell({includeEmpty:true}, cell => {
-    cell.font = { bold: true, size: 12 };
-    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B2A4A'} };
-    cell.font = { bold: true, size: 12, color: {argb:'FFFFFFFF'} };
-    cell.border = { top:thinBorder, left:thinBorder, bottom:thinBorder, right:thinBorder };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-  });
-
-  const buf = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'الوارد اليومي.xlsx';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  await downloadXlsxWorkbook(wb, 'الوارد اليومي.xlsx');
 }
 
 /* يحوّل رقم تليفون مصري محلي (01xxxxxxxxx) لصيغة دولية لواتساب (20xxxxxxxxx) */
