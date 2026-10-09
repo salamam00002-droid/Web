@@ -838,6 +838,18 @@
     display:block; height:100%; width:0; background:#C89B3C; border-radius:4px;
     animation:welcomeBar 6s linear forwards;
   }
+  #welcomeScreen .welcome-bg{position:absolute; inset:0; overflow:hidden; pointer-events:none;}
+  #welcomeScreen .welcome-bg span{
+    position:absolute; bottom:-60px; line-height:1; opacity:0;
+    animation:welcomeFloat linear infinite;
+  }
+  #welcomeScreen img, #welcomeScreen .welcome-bar{position:relative; z-index:1;}
+  @keyframes welcomeFloat{
+    0%{transform:translateY(0) rotate(0deg); opacity:0;}
+    10%{opacity:.9;}
+    90%{opacity:.9;}
+    100%{transform:translateY(-110vh) rotate(var(--rot,25deg)); opacity:0;}
+  }
   @keyframes welcomeIn{from{opacity:0; transform:scale(.92);} to{opacity:1; transform:scale(1);}}
   @keyframes welcomeBar{from{width:0;} to{width:100%;}}
 </style>
@@ -846,10 +858,26 @@
 
 <!-- WELCOME SCREEN -->
 <div id="welcomeScreen">
+  <div class="welcome-bg" id="welcomeBg"></div>
   <img src="11.png" alt="مرحباً" onerror="this.style.display='none'">
   <div class="welcome-bar"><span></span></div>
 </div>
 <script>
+  (function(){
+    var bg = document.getElementById('welcomeBg');
+    if(!bg) return;
+    var icons = ['❤️','❤️','❤️','🌹','🌹','🌷','🌸','🌺','🌼','💐','🥀','💖'];
+    for(var i=0;i<34;i++){
+      var el = document.createElement('span');
+      el.textContent = icons[Math.floor(Math.random()*icons.length)];
+      el.style.left = (Math.random()*96) + '%';
+      el.style.fontSize = (16 + Math.random()*26) + 'px';
+      el.style.animationDuration = (5 + Math.random()*5) + 's';
+      el.style.animationDelay = (-Math.random()*8) + 's';
+      el.style.setProperty('--rot', (Math.random()*80-40) + 'deg');
+      bg.appendChild(el);
+    }
+  })();
   setTimeout(function(){
     var w = document.getElementById('welcomeScreen');
     if(!w) return;
