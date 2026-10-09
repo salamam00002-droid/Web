@@ -816,9 +816,48 @@
   .picker-empty{padding:22px; text-align:center; color:var(--muted); font-size:14px;}
   .sale-mode-toggle{display:flex; gap:8px;}
   .sale-mode-toggle .btn{flex:1; justify-content:center;}
+
+  /* ===================== WELCOME SCREEN ===================== */
+  #welcomeScreen{
+    position:fixed; inset:0; z-index:9999;
+    background:#FFFFFF;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:28px; padding:24px;
+    transition:opacity .5s ease, visibility .5s ease;
+  }
+  #welcomeScreen.hide{opacity:0; visibility:hidden; pointer-events:none;}
+  #welcomeScreen img{
+    max-width:min(70vw,360px); max-height:55vh; object-fit:contain;
+    animation:welcomeIn .8s ease both;
+  }
+  #welcomeScreen .welcome-bar{
+    width:min(60vw,240px); height:4px; border-radius:4px;
+    background:#E4DFD3; overflow:hidden;
+  }
+  #welcomeScreen .welcome-bar span{
+    display:block; height:100%; width:0; background:#C89B3C; border-radius:4px;
+    animation:welcomeBar 4s linear forwards;
+  }
+  @keyframes welcomeIn{from{opacity:0; transform:scale(.92);} to{opacity:1; transform:scale(1);}}
+  @keyframes welcomeBar{from{width:0;} to{width:100%;}}
 </style>
 </head>
 <body>
+
+<!-- WELCOME SCREEN -->
+<div id="welcomeScreen">
+  <img src="11.png" alt="مرحباً" onerror="this.style.display='none'">
+  <div class="welcome-bar"><span></span></div>
+</div>
+<script>
+  setTimeout(function(){
+    var w = document.getElementById('welcomeScreen');
+    if(!w) return;
+    w.classList.add('hide');
+    setTimeout(function(){ w.remove(); }, 600);
+  }, 4000);
+</script>
+
 
 <header>
   <div class="brand"><img src="logo.png" alt="لوجو" class="brand-logo" onerror="this.style.display='none'"> مخزنى</div>
