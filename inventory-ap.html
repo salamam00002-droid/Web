@@ -2276,6 +2276,9 @@ function migrateColorNames(itemId, map){
 }
 
 function saveItem(){
+  /* لو كتب لون/مقاس ونسي يدوس "إضافة" نضيفه تلقائياً قبل الحفظ */
+  { const ci = document.getElementById('itemColorInput'), si = document.getElementById('itemColorSizeInput');
+    if((ci && ci.value.trim()) || (itemModalSaleType==='piece' && si && si.value.trim())) addItemColorChip(); }
   const id = document.getElementById('itemId').value;
   const name = document.getElementById('itemName').value.trim();
   const category = document.getElementById('itemCategory').value.trim();
@@ -2374,7 +2377,15 @@ function saveItem(){
       .then(()=> Object.keys(renameMap).length ? migrateColorNames(id, renameMap) : null)
       .then(()=>{
         if(delta !== 0){
-          logStockMovement({itemId:id, itemName:name, type: delta>0?'in':'out', qty: Math.abs(delta), date: today, note:'تعديل يدوي للرصيد الفعلي', sourceType:'manual', sourceId:id});
+          /* لو التعديل جاي من كميات الألوان وبيطابق الفرق الكلي، نسجله لكل لون/مقاس على حدة */
+          const oldCS = (oldItem && oldItem.colorStock) || null;
+          const perColor = (usingColorStock && oldCS) ? itemColorsList.map(c=>({c, d:(Number(colorStock[c.name])||0) - (Number(oldCS[(c.orig&&c.orig!==c.name)?c.orig:c.name])||0)})) : [];
+          const perSum = perColor.reduce((a,x)=>a+x.d,0);
+          if(perColor.length && perSum===delta){
+            perColor.filter(x=>x.d!==0).forEach(x=> logStockMovement({itemId:id, itemName:name, type:x.d>0?'in':'out', qty:Math.abs(x.d), date:today, note:'تعديل يدوي للرصيد الفعلي', sourceType:'manual', sourceId:id, color:x.c.name}));
+          } else {
+            logStockMovement({itemId:id, itemName:name, type: delta>0?'in':'out', qty: Math.abs(delta), date: today, note:'تعديل يدوي للرصيد الفعلي', sourceType:'manual', sourceId:id});
+          }
         }
         showToast('تم تعديل الصنف'); closeModal('itemModalOverlay');
       })
@@ -2397,7 +2408,13 @@ function saveItem(){
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('items').add(payload)
       .then((ref)=>{
-        if(stockQty>0){
+        if(usingColorStock){
+          /* رصيد افتتاحي منفصل لكل لون (ولكل مقاس لو الصنف بالقطعة) عشان يظهروا في الوارد وسجل الحركة */
+          itemColorsList.forEach(c=>{
+            const q = Number(colorStock[c.name])||0;
+            if(q>0) logStockMovement({itemId:ref.id, itemName:name, type:'in', qty:q, date:today, note:'رصيد افتتاحي', sourceType:'manual', sourceId:ref.id, color:c.name});
+          });
+        } else if(stockQty>0){
           logStockMovement({itemId:ref.id, itemName:name, type:'in', qty: stockQty, date: today, note:'رصيد افتتاحي', sourceType:'manual', sourceId:ref.id});
         }
         /* صنف جديد بالطقم → يتنسخ تلقائياً في أصناف بالقطعة (الاسم + الصورة الرئيسية فقط، رصيد 0 وسعر 0 وبدون ألوان) */
@@ -3906,7 +3923,7 @@ function deleteReceipt(id){
 function getLegacyReceiptRows(){
   return stockMovements.filter(m=> m.type==='in' && m.sourceType==='manual').map(m=>{
     const it = items.find(i=>i.id===m.itemId);
-    return {id:m.id, legacy:true, date:m.date, itemId:m.itemId, itemName:m.itemName, sku:(it&&it.sku)||'', color:'', qty:m.qty, supplier:'',
+    return {id:m.id, legacy:true, date:m.date, itemId:m.itemId, itemName:m.itemName, sku:(it&&it.sku)||'', color:m.color||'', qty:m.qty, supplier:'',
             note: m.note || ''};
   });
 }
