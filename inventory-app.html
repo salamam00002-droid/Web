@@ -836,7 +836,6 @@
   }
   #welcomeScreen .welcome-bar span{
     display:block; height:100%; width:0; background:#C89B3C; border-radius:4px;
-    animation:welcomeBar 6s linear forwards;
   }
   #welcomeScreen .welcome-bg{position:absolute; inset:0; overflow:hidden; pointer-events:none;}
   #welcomeScreen .welcome-bg span{
@@ -851,6 +850,7 @@
     100%{transform:translateY(-110vh) rotate(var(--rot,25deg)); opacity:0;}
   }
   @keyframes welcomeIn{from{opacity:0; transform:scale(.92);} to{opacity:1; transform:scale(1);}}
+  #welcomeScreen.started .welcome-bar span{animation:welcomeBar 6s linear forwards;}
   @keyframes welcomeBar{from{width:0;} to{width:100%;}}
 </style>
 </head>
@@ -878,12 +878,31 @@
       bg.appendChild(el);
     }
   })();
-  setTimeout(function(){
+  (function(){
     var w = document.getElementById('welcomeScreen');
     if(!w) return;
-    w.classList.add('hide');
-    setTimeout(function(){ w.remove(); }, 600);
-  }, 6000);
+    var img = w.querySelector('img');
+    var started = false;
+    function start(){
+      if(started) return;
+      started = true;
+      w.classList.add('started');
+      setTimeout(function(){
+        w.classList.add('hide');
+        setTimeout(function(){ w.remove(); }, 600);
+      }, 6000);
+    }
+    function whenReady(){
+      if(img.decode){ img.decode().then(start, start); } else { start(); }
+    }
+    if(!img || img.style.display === 'none'){ start(); }
+    else if(img.complete){ whenReady(); }
+    else {
+      img.addEventListener('load', whenReady);
+      img.addEventListener('error', start);
+    }
+    setTimeout(start, 20000); /* احتياطى لو النت ضعيف جدا */
+  })();
 </script>
 
 
