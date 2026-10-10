@@ -4245,11 +4245,11 @@ function dsCalendarChangeMonth(delta){
 }
 
 function dsCalendarGoToday(){
-  const todayStr = todayStr();
-  const t = parseYmd(todayStr);
+  const todayVal = todayStr();
+  const t = parseYmd(todayVal);
   dsCalendarMonth = new Date(t.y, t.mo-1, 1);
-  document.getElementById('dsFilterDateFrom').value = todayStr;
-  document.getElementById('dsFilterDateTo').value = todayStr;
+  document.getElementById('dsFilterDateFrom').value = todayVal;
+  document.getElementById('dsFilterDateTo').value = todayVal;
   renderDailySales();
 }
 
@@ -4289,7 +4289,7 @@ function renderDsCalendarGrid(){
   const dayLabels = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
   const startOffset = new Date(year, month, 1).getDay(); // 0=أحد
   const daysInMonth = new Date(year, month+1, 0).getDate();
-  const todayStr = todayStr();
+  const todayVal = todayStr();
   const fromDate = document.getElementById('dsFilterDateFrom')?.value || '';
   const toDate = document.getElementById('dsFilterDateTo')?.value || '';
 
@@ -4307,7 +4307,7 @@ function renderDsCalendarGrid(){
   for(let day=1; day<=daysInMonth; day++){
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const classes = ['ds-calendar-day'];
-    if(dateStr===todayStr) classes.push('ds-today');
+    if(dateStr===todayVal) classes.push('ds-today');
     if(dateStr===fromDate || dateStr===toDate) classes.push('ds-selected');
     else if(fromDate && toDate && dateStr>fromDate && dateStr<toDate) classes.push('ds-inrange');
     if(salesDaysSet.has(dateStr)) classes.push('ds-hassales');
