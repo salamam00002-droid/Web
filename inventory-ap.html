@@ -1399,7 +1399,7 @@
     </div>
     <div class="modal-body">
       <p class="page-sub" style="margin-bottom:16px;">
-        النسخة الاحتياطية تشمل كل البيانات: الأصناف، عمليات التجار، المعاملات المنتهية، وسجل حركة المخزون — فى ملف JSON واحد يُحفظ على جهازك.
+        النسخة الاحتياطية تشمل كل البيانات: الأصناف، التجار، المبيعات، الوارد، الطلبات، المعاملات المنتهية، وسجل حركة المخزون — فى ملف JSON واحد يُحفظ على جهازك.
       </p>
       <button class="btn btn-gold" style="width:100%; margin-bottom:20px;" onclick="exportFullBackup()">⬇️ تصدير نسخة احتياطية</button>
 
@@ -1667,6 +1667,7 @@ function switchView(name){
     populateSaleMerchantSelect();
     populateSaleItemSelect();
     populateRcItemSelect();
+    refreshDefaultDates();
     if(!document.getElementById('dsFilterDateFrom').value) setDailySalesToday();
     else renderDailySales();
   }
@@ -1734,6 +1735,24 @@ function updateNotifications(){
 function arabicToEnglishNums(s){
   return String(s).replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => d.charCodeAt(0) - 1632);
 }
+/* تاريخ محلي (بتوقيت الجهاز) بدل UTC — عشان اللي بعد 12 بالليل ما يتسجلش بتاريخ امبارح */
+function localYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayStr(){ return localYmd(new Date()); }
+let _autoDate = todayStr();
+/* لو التطبيق فضل مفتوح لتاني يوم: نحدّث التواريخ الافتراضية (بس لو لسه على تاريخ اليوم القديم) */
+function refreshDefaultDates(){
+  const t = todayStr();
+  if(t===_autoDate) return false;
+  const old = _autoDate; _autoDate = t;
+  ['saleDate','rcDate'].forEach(id=>{ const el=document.getElementById(id); if(el && (!el.value || el.value===old)) el.value=t; });
+  ['dsFilterDateFrom','dsFilterDateTo','rcFilterDateFrom','rcFilterDateTo'].forEach(id=>{ const el=document.getElementById(id); if(el && el.value===old) el.value=t; });
+  dsCalendarMonth = null; rcCalendarMonth = null;
+  return true;
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) return;
+  if(refreshDefaultDates() && document.getElementById('view-dailysales').classList.contains('active')){ renderDailySales(); renderReceipts(); }
+});
 function fmt(n){
   n = Number(arabicToEnglishNums(String(n||0)))||0;
   return n.toLocaleString('en-US', {maximumFractionDigits:2});
@@ -1748,7 +1767,7 @@ function itemCreatedDateStr(item){
   if(!item || !item.createdAt) return '';
   const dateObj = item.createdAt.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
   if(isNaN(dateObj.getTime())) return '';
-  return fmtDate(dateObj.toISOString().slice(0,10));
+  return fmtDate(localYmd(dateObj));
 }
 /* ===== بيع القطع المنفصلة من الطقم =====
    item.pieces = [{id,name,size,price}] (اختياري). كل عملية بيع/طلب لقطعة تحمل pieceId.
@@ -1797,7 +1816,7 @@ function issuedQtyFor(itemId){
   const it = _itemById(itemId);
   if(!(it && hasColorStock(it))){ const x=_issuedSplit(itemId); return x.full+_maxPer(x.per); }
   const colors = new Set();
-  const collect = e=>{ if(e.itemId===itemId) colors.add(e.color||''); };
+  const collect = e=>{ if(e.itemId!==itemId) return; const c = e.color||''; if(colorOrphan(it, c)) return; colors.add(c); };
   saleEntries.forEach(collect);
   merchantTxs.forEach(tx=>(tx.items||[]).forEach(collect));
   stockReceipts.forEach(collect);
@@ -1809,7 +1828,9 @@ function remainingQtyFor(item){
   return (Number(item.stockQty)||0) - issuedQtyFor(item.id);
 }
 /* للعرض: الكمية بالمخزن تشمل الوارد (أطقم/أصناف كاملة)، والمنصرف = الفرق، فلا يظهر المنصرف بالسالب بعد الوارد */
-function receivedFullFor(itemId){ return stockReceipts.reduce((s,r)=> s + ((r.itemId===itemId && !r.pieceId) ? (Number(r.qty)||0) : 0), 0); }
+/* لون اتشال من الصنف (لسه ليه سجلات قديمة) — مش بيدخل في حساب إجمالي الصنف */
+function colorOrphan(it, c){ return !!(it && hasColorStock(it) && c && !Object.prototype.hasOwnProperty.call(it.colorStock, c)); }
+function receivedFullFor(itemId){ const it = _itemById(itemId); return stockReceipts.reduce((s,r)=> s + ((r.itemId===itemId && !r.pieceId && !colorOrphan(it, r.color||'')) ? (Number(r.qty)||0) : 0), 0); }
 function stockTotalFor(item){ return (Number(item.stockQty)||0) + receivedFullFor(item.id); }
 function issuedShownFor(item){ return stockTotalFor(item) - remainingQtyFor(item); }
 /* المنصرف من لون معين لصنف معين */
@@ -1936,7 +1957,8 @@ function openItemModal(item, saleType){
     const hasQty = item && item.colorStock && item.colorStock[c]!==undefined;
     const image = (item && item.colorImages && item.colorImages[c]) || '';
     const price = (item && item.colorPrices && item.colorPrices[c]!==undefined) ? item.colorPrices[c] : '';
-    return {name: c, orig: c, qty: hasQty ? remainingQtyForColor(item, c) : 0, image, price};
+    const q0 = hasQty ? remainingQtyForColor(item, c) : 0;
+    return {name: c, orig: c, qty: q0, qty0: q0, hasStock0: !!hasQty, image, price};
   });
   document.getElementById('itemColorInput').value = '';
   document.getElementById('itemColorQtyInput').value = '';
@@ -2046,6 +2068,13 @@ function syncItemStockFromColors(){
     if(itemColorsList.length>0 && itemColorsManaged){
       const total = itemColorsList.reduce((s,c)=> s + (Number(c.qty)||0), 0);
       document.getElementById('itemStockDisplay').value = total;
+    }
+    /* الرصيد بيتحدد من كميات الألوان، فنخفي خانة "تعديل الرصيد الفعلي" عشان ما يحصلش تعارض */
+    const adjF = document.getElementById('itemStockAdjField');
+    if(adjF){
+      const managed = itemColorsList.length>0 && itemColorsManaged;
+      adjF.style.display = managed ? 'none' : '';
+      if(managed) document.getElementById('itemStockAdj').value = '';
     }
   } else {
     /* في وضع الإضافة: نحدّث حقل الكمية الابتدائية */
@@ -2271,6 +2300,7 @@ function migrateColorNames(itemId, map){
   });
   flat('saleEntries', saleEntries);
   flat('stockReceipts', stockReceipts);
+  flat('stockMovements', stockMovements);
   nested('merchantTransactions', merchantTxs);
   nested('archivedMerchantTransactions', archivedMerchantTxs);
   nested('orders', typeof orders!=='undefined' ? orders : []);
@@ -2308,7 +2338,7 @@ function saveItem(){
   const colorPrices = {};
   if(itemModalSaleType==='piece') itemColorsList.forEach(c=>{ if(c.price!=='' && c.price!==undefined && c.price!==null) colorPrices[c.name] = Number(c.price)||0; });
   const usingColorStock = itemColorsList.length>0 && itemColorsManaged;
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
 
   if(!name){ showToast('من فضلك أدخل اسم الصنف'); return; }
 
@@ -2336,13 +2366,10 @@ function saveItem(){
       const lines = Object.keys(renameMap).map(o=> '• '+o+'  ←  '+renameMap[o]).join('\n');
       if(!confirm('سيتم تغيير اسم الألوان التالية:\n'+lines+'\n\nوسيتم تحديث الاسم تلقائياً في سجلات المبيعات والواردات والطلبات القديمة الخاصة بهذا الصنف. متابعة؟')) return;
     }
-    if(removedColorsWithHistory.length){
-      const proceed = confirm(
-        'الألوان التالية عليها مبيعات مسجلة سابقاً ولن تعود موجودة في الصنف بعد الحفظ:\n' +
-        removedColorsWithHistory.join('، ') +
-        '\n\nالمبيعات القديمة بهذه الألوان هتفضل في السجل لكن حساب "المتبقي" الخاص بها هيتوقف. متابعة الحفظ؟'
-      );
-      if(!proceed) return;
+    const removedAll = oldColorNames.filter(oc=> !newColorNames.includes(oc) && !renamedFrom.has(oc));
+    if(removedAll.length){
+      const lines = removedAll.map(oc=> '• '+oc+' — متبقي '+fmt(remainingQtyForColor(oldItem, oc))+' | مبيعات سابقة: '+fmt(issuedQtyForColor(id, oc))).join('\n');
+      if(!confirm('⚠️ تحذير: الألوان التالية هتتشال من الصنف:\n'+lines+'\n\nالمتبقي منها هيتشال من رصيد الصنف، والمبيعات القديمة هتفضل في السجل. لا يمكن التراجع بسهولة. متابعة الحفظ؟')) return;
     }
 
     const adjRaw = document.getElementById('itemStockAdj').value;
@@ -2361,15 +2388,28 @@ function saveItem(){
     const colorStock = {};
     if(usingColorStock){
       itemColorsList.forEach(c=>{
-        const adjColorRaw = Math.max(0, Number(c.qty)||0); // qty هنا = المتبقي الجديد للون (لا يقل عن صفر)
-        const issuedColor = issuedQtyForColor(id, (c.orig && c.orig!==c.name) ? c.orig : c.name);
-        colorStock[c.name] = adjColorRaw + issuedColor;
+        const origName = (c.orig && c.orig!==c.name) ? c.orig : c.name;
+        const liveBase = (c.orig && c.hasStock0 && oldItem && oldItem.colorStock && oldItem.colorStock[c.orig]!==undefined) ? Number(oldItem.colorStock[c.orig])||0 : null;
+        if(liveBase!==null){
+          /* نطبّق فرق التعديل اللي المستخدم عمله بس على الرصيد الحالي، فأي بيع حصل وقت فتح النافذة ما يتلغيش */
+          const changed = (Number(c.qty)||0) !== (Number(c.qty0)||0);
+          const diff = changed ? Math.max(0, Number(c.qty)||0) - (Number(c.qty0)||0) : 0;
+          colorStock[c.name] = liveBase + diff;
+        } else {
+          const adjColorRaw = Math.max(0, Number(c.qty)||0); // لون جديد: الكمية المدخلة = المتبقي
+          colorStock[c.name] = adjColorRaw + issuedQtyForColor(id, origName);
+        }
       });
       if(adjRaw === '' || adjRaw === null){
         /* إعادة حساب newStockQty من الألوان فقط إذا لم يُدخل تعديلاً يدوياً */
         newStockQty = Object.values(colorStock).reduce((s,v)=> s+v, 0);
         delta = newStockQty - oldStockQty;
       }
+    }
+
+    if(delta !== 0){
+      const beforeRem = currentRemaining, afterRem = beforeRem + delta;
+      if(!confirm('⚠️ تحذير: التعديل ده هيغيّر رصيد المخزون للصنف "'+name+'"\n\nالمتبقي الحالي: '+fmt(beforeRem)+'\nالمتبقي بعد الحفظ: '+fmt(afterRem)+' ('+(delta>0?'+':'')+fmt(delta)+')\n\nهيتسجل في سجل الحركة كتعديل يدوي. متابعة؟')) return;
     }
 
     const payload = { name, category, sku, color, colors, piecesCount, price, stockQty: newStockQty, alertThreshold: null, image: document.getElementById('itemImageData').value || '' };
@@ -2644,7 +2684,9 @@ function openItemArchiveModal(type){
 /* الانتقال لسجل الحركة مع فلترة على صنف معين */
 let movTab = 'set';   /* 'set' | 'piece' — سجل الحركة منفصل تماماً لكل قسم */
 let movItemId = '';   /* فلتر بالصنف نفسه (وليس بالاسم) عند الدخول من كارت الصنف */
-function movIsPiece(m){ const it = items.find(i=> i.id===m.itemId); return !!(it && itemIsPiece(it)); }
+/* نوع السجل (طقم/قطعة): من الصنف لو موجود، وإلا من النوع المخزّن على السجل (للأصناف المحذوفة) */
+function recIsPiece(r){ const it = _itemById(r.itemId); return it ? itemIsPiece(it) : r.itemType==='piece'; }
+function movIsPiece(m){ return recIsPiece(m); }
 function setMovTab(tab){
   movTab = tab==='piece' ? 'piece' : 'set';
   movItemId = '';
@@ -2730,13 +2772,14 @@ function exportFullBackup(){
     saleEntries: saleEntries.map(serializeDocForExport),
     archivedMerchantTxs: archivedMerchantTxs.map(serializeDocForExport),
     stockMovements: stockMovements.map(serializeDocForExport),
-    stockReceipts: stockReceipts.map(serializeDocForExport)
+    stockReceipts: stockReceipts.map(serializeDocForExport),
+    orders: orders.map(serializeDocForExport)
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `نسخة-احتياطية-مخزنى-${new Date().toISOString().slice(0,10)}.json`;
+  a.href = url; a.download = `نسخة-احتياطية-مخزنى-${todayStr()}.json`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast('تم تصدير النسخة الاحتياطية');
@@ -2757,7 +2800,7 @@ function handleImportBackupFile(e){
     if(!data || (!Array.isArray(data.items) && !Array.isArray(data.merchantTxs))){
       showToast('صيغة النسخة الاحتياطية غير معروفة'); e.target.value=''; return;
     }
-    const counts = `${(data.items||[]).length} صنف، ${(data.merchantTxs||[]).length} عملية تاجر، ${(data.archivedMerchantTxs||[]).length} معاملة منتهية، ${(data.stockMovements||[]).length} حركة مخزون`;
+    const counts = `${(data.items||[]).length} صنف، ${(data.merchantTxs||[]).length} عملية تاجر، ${(data.archivedMerchantTxs||[]).length} معاملة منتهية، ${(data.stockMovements||[]).length} حركة مخزون${Array.isArray(data.orders)?'، '+data.orders.length+' طلب':''}`;
     const ok1 = confirm(`تحذير: سيتم حذف كل البيانات الحالية فى قاعدة البيانات نهائياً واستبدالها بمحتوى هذا الملف (${counts}).\n\nهل تريد المتابعة؟`);
     if(!ok1){ e.target.value=''; return; }
     const ok2 = confirm('تأكيد أخير: هذه الخطوة لا يمكن التراجع عنها بعد التنفيذ. متابعة؟');
@@ -2800,26 +2843,29 @@ function writeBackupCollection(name, list){
 
 function restoreFullBackup(data){
   showToast('جارٍ استعادة النسخة الاحتياطية...');
-  Promise.all([
-    clearCollection('items'),
-    clearCollection('merchantTransactions'),
-    clearCollection('merchantProfiles'),
-    clearCollection('saleEntries'),
-    clearCollection('archivedMerchantTransactions'),
-    clearCollection('stockMovements'),
-    clearCollection('stockReceipts')
-  ]).then(()=> Promise.all([
-    writeBackupCollection('items', data.items),
-    writeBackupCollection('merchantTransactions', data.merchantTxs||[]),
-    writeBackupCollection('merchantProfiles', data.merchantProfiles||[]),
-    writeBackupCollection('saleEntries', data.saleEntries||[]),
-    writeBackupCollection('archivedMerchantTransactions', data.archivedMerchantTxs||[]),
-    writeBackupCollection('stockMovements', data.stockMovements||[]),
-    writeBackupCollection('stockReceipts', data.stockReceipts||[])
-  ])).then(()=>{
-    showToast('تمت استعادة النسخة الاحتياطية بنجاح');
-    closeModal('backupModalOverlay');
-  }).catch(err=> showToast('خطأ أثناء الاستعادة: '+err.message));
+  const specs = [
+    ['items', data.items], ['merchantTransactions', data.merchantTxs], ['merchantProfiles', data.merchantProfiles],
+    ['saleEntries', data.saleEntries], ['archivedMerchantTransactions', data.archivedMerchantTxs],
+    ['stockMovements', data.stockMovements], ['stockReceipts', data.stockReceipts]
+  ];
+  /* نسخ قديمة من غير طلبات: ما نلمسش مجموعة الطلبات الحالية */
+  if(Array.isArray(data.orders)) specs.push(['orders', data.orders]);
+  const prepared = specs.map(([name, list])=> ({
+    name,
+    list: (list||[]).map(x=> ({...x, id: x.id || db.collection(name).doc().id}))
+  }));
+  /* الأول نكتب بيانات النسخة (بنفس المعرّفات)، وبعدين نمسح اللي مش موجود فيها — فلو حصل خطأ في النص ما تضيعش بيانات */
+  Promise.all(prepared.map(c=> writeBackupCollection(c.name, c.list)))
+    .then(()=> Promise.all(prepared.map(c=>{
+      const keep = new Set(c.list.map(x=> x.id));
+      return db.collection(c.name).get().then(snap=>
+        commitOpsInChunks(snap.docs.filter(d=> !keep.has(d.id)).map(d=> ({ref:d.ref, op:'delete'})))
+      );
+    })))
+    .then(()=>{
+      showToast('تمت استعادة النسخة الاحتياطية بنجاح');
+      closeModal('backupModalOverlay');
+    }).catch(err=> showToast('خطأ أثناء الاستعادة: '+err.message));
 }
 
 let dashAuditTab = 'set'; /* يفضل محفوظ بين تحديثات لوحة التحكم */
@@ -2898,9 +2944,11 @@ function escapeHtml(s){
 /* ===================== STOCK MOVEMENTS: FIRESTORE ===================== */
 function logStockMovement({itemId, itemName, type, qty, date, note, sourceType, sourceId, color}){
   if(!db) return;
+  const _mit = _itemById(itemId);
   db.collection('stockMovements').add({
+    itemType: (_mit && itemIsPiece(_mit)) ? 'piece' : 'set',
     itemId: itemId||'', itemName: itemName||'', type, qty: Number(qty)||0,
-    date: date || new Date().toISOString().slice(0,10),
+    date: date || todayStr(),
     note: note||'', sourceType: sourceType||'', sourceId: sourceId||'', color: color||'',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   }).catch(e=> console.error('movement log error', e));
@@ -3005,7 +3053,7 @@ function renderArchived(){
     return;
   }
   box.innerHTML = archivedMerchantTxs.map(tx=>{
-    const archivedDate = tx.archivedAt && tx.archivedAt.toDate ? tx.archivedAt.toDate().toISOString().slice(0,10) : '';
+    const archivedDate = tx.archivedAt && tx.archivedAt.toDate ? localYmd(tx.archivedAt.toDate()) : '';
     return `
     <div class="merchant-card">
       <div class="merchant-card-head">
@@ -3088,8 +3136,10 @@ function normalizeMerchantName(n){
 /* كل عمليات التاجر مجمّعة من مصدرين: المبيعات الحالية (saleEntries) + السجل القديم (merchantTxs + archivedMerchantTxs) */
 function getMerchantOperationRows(profile){
   const rows = [];
+  const nameKey = normalizeMerchantName(profile.name);
 
-  saleEntries.filter(s=> s.merchantId===profile.id).forEach(r=>{
+  /* المبيعات اللي مالهاش merchantId (زي المحوّلة من الطلبات القديمة) بتتربط بالاسم */
+  saleEntries.filter(s=> s.merchantId===profile.id || (!s.merchantId && normalizeMerchantName(s.merchantName)===nameKey)).forEach(r=>{
     rows.push({
       date: r.date,
       itemName: r.itemName,
@@ -3102,7 +3152,6 @@ function getMerchantOperationRows(profile){
     });
   });
 
-  const nameKey = normalizeMerchantName(profile.name);
   const legacyTagged = [
     ...merchantTxs.filter(tx=> normalizeMerchantName(tx.merchantName)===nameKey).map(tx=> ({tx, status:'سجل قديم — مفتوحة'})),
     ...archivedMerchantTxs.filter(tx=> normalizeMerchantName(tx.merchantName)===nameKey).map(tx=> ({tx, status:'سجل قديم — مؤرشفة'}))
@@ -3358,7 +3407,7 @@ function saveSalePieces(c){
   const mName = merchantProfile ? merchantProfile.name : '';
   Promise.all(chosen.map(r=>{
     const label = pieceLabel(itemObj, r.piece);
-    const payload = {date:dateVal, merchantId, merchantName:mName, itemId:itemObj.id, itemName:label, sku, color, qty:r.qty, price:r.price,
+    const payload = {date:dateVal, merchantId, merchantName:mName, itemId:itemObj.id, itemType:(itemIsPiece(itemObj)?'piece':'set'), itemName:label, sku, color, qty:r.qty, price:r.price,
       ...(r.piece ? {pieceId:r.piece.id, pieceName:r.piece.name, size:r.piece.size||''} : {}),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()};
     return db.collection('saleEntries').add(payload).then(ref=>{
@@ -3466,6 +3515,7 @@ function saveSaleEntry(){
   if(!merchantId){ showToast('من فضلك اختر التاجر'); return; }
   if(!itemId){ showToast('من فضلك اختر الصنف'); return; }
   if(qty<=0 && !itemHasPieces(items.find(i=>i.id===itemId))){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
+  if(!Number.isInteger(qty)){ showToast('الكمية لازم تكون رقم صحيح بدون كسور'); return; }
   if(colorField.style.display !== 'none' && !color){ showToast('من فضلك اختر اللون'); return; }
 
   const merchantProfile = merchantProfiles.find(p=>p.id===merchantId);
@@ -3483,11 +3533,14 @@ function saveSaleEntry(){
     return;
   }
 
+  if(!confirm('تأكيد عملية البيع\n\nالتاجر: '+(merchantProfile?merchantProfile.name:'')+'\nالصنف: '+itemObj.name+(color?' ('+color+')':'')+'\nالكمية: '+fmt(qty)+' × '+fmt(price)+' = '+fmt(qty*price)+'\n\nهيتخصم من المخزون: المتاح '+fmt(availableQty)+' ← المتبقي بعد البيع '+fmt(availableQty-qty)+'\n\nمتابعة؟')) return;
+
   const payload = {
     date: dateVal,
     merchantId,
     merchantName: merchantProfile ? merchantProfile.name : '',
     itemId,
+    itemType: itemIsPiece(itemObj) ? 'piece' : 'set',
     itemName: pieceLabel(itemObj, salePiece),
     sku,
     color,
@@ -3509,7 +3562,7 @@ function saveSaleEntry(){
 }
 
 function deleteSaleEntry(id, itemId, itemName, qty, date){
-  if(!confirm('هل تريد حذف هذه العملية؟ سيتم استعادة الكمية للمخزون.')) return;
+  if(!confirm('⚠️ تحذير: حذف عملية بيع\n\n"'+(itemName||'')+'" — الكمية '+fmt(qty)+' بتاريخ '+fmtDate(date)+'\n\nسيتم حذفها من المبيعات وإرجاع الكمية للمخزون، وهتتخصم من إجمالي مشتريات التاجر.\n\nلا يمكن التراجع. هل أنت متأكد؟')) return;
   const _se = saleEntries.find(x=>x.id===id);
   const _seColor = (_se && _se.color) || '';
   db.collection('saleEntries').doc(id).delete().then(()=>{
@@ -3536,7 +3589,7 @@ function addMerchantItemRow(existing){
   const wrap = document.createElement('div');
   wrap.className = 'merchant-item-row';
   wrap.id = rowId;
-  const defaultItemDate = existing ? (existing.itemDate || new Date().toISOString().slice(0,10)) : new Date().toISOString().slice(0,10);
+  const defaultItemDate = existing ? (existing.itemDate || todayStr()) : todayStr();
   wrap.innerHTML = `
     <div class="mi-row1">
       <div class="merchant-item-thumb mi-thumb" id="thumb_${rowId}">🧳</div>
@@ -3864,9 +3917,10 @@ function setDsTab(tab){
   document.getElementById('dsTabReceipts').className = 'btn btn-sm ' + (rc?'btn-gold':'btn-outline');
   if(rc){
     populateRcItemSelect();
-    if(!document.getElementById('rcDate').value) document.getElementById('rcDate').value = new Date().toISOString().slice(0,10);
+    refreshDefaultDates();
+    if(!document.getElementById('rcDate').value) document.getElementById('rcDate').value = todayStr();
     if(!document.getElementById('rcFilterDateFrom').value){
-      const t = new Date().toISOString().slice(0,10);
+      const t = todayStr();
       document.getElementById('rcFilterDateFrom').value = t; document.getElementById('rcFilterDateTo').value = t;
     }
     renderReceipts();
@@ -3935,10 +3989,14 @@ function saveReceipt(){
     if(!lines.length){ showToast('اختر الطقم كامل أو قطعة واحدة على الأقل'); return; }
   } else lines = [{piece:null, qty:Number(document.getElementById('rcQty').value)||0}];
   if(lines.some(l=>l.qty<=0)){ showToast('الكمية يجب أن تكون أكبر من صفر'); return; }
+  if(lines.some(l=>!Number.isInteger(l.qty))){ showToast('الكمية لازم تكون رقم صحيح بدون كسور'); return; }
+  { const totalQ = lines.reduce((x,l)=>x+l.qty,0);
+    const curRem = (hasColorStock(it) && color) ? remainingQtyForColor(it, color) : remainingQtyFor(it);
+    if(!confirm('تأكيد تسجيل وارد\n\nالصنف: '+it.name+(color?' ('+color+')':'')+'\nالكمية: '+fmt(totalQ)+'\n\nهيزيد المخزون: المتبقي الحالي '+fmt(curRem)+' ← '+fmt(curRem+totalQ)+'\n\nمتابعة؟')) return; }
   Promise.all(lines.map(l=>{
     const label = pieceLabel(it, l.piece);
     return db.collection('stockReceipts').add({
-      date, itemId:it.id, itemName:label, sku:it.sku||'', color, qty:l.qty, supplier, note,
+      date, itemId:it.id, itemType:(itemIsPiece(it)?'piece':'set'), itemName:label, sku:it.sku||'', color, qty:l.qty, supplier, note,
       ...(l.piece ? {pieceId:l.piece.id, pieceName:l.piece.name, size:l.piece.size||''} : {}),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(ref=> logStockMovement({itemId:it.id, itemName:label, type:'in', qty:l.qty, date, note:'وارد'+(supplier?' من '+supplier:'')+(note?' — '+note:''), sourceType:'receipt', sourceId:ref.id, color}));
@@ -3967,6 +4025,14 @@ function deleteMovement(id){
   const sale = m.sourceType==='sale' ? saleEntries.find(x=>x.id===m.sourceId) : null;
   const fail = e=> showToast('خطأ: '+e.message);
   if(receipt){
+    const rit = _itemById(receipt.itemId);
+    if(rit && !receipt.pieceId){
+      const avail = (hasColorStock(rit) && receipt.color) ? remainingQtyForColor(rit, receipt.color) : remainingQtyFor(rit);
+      if(avail - (Number(receipt.qty)||0) < 0){
+        alert(`❌ لا يمكن حذف هذا الوارد\n\n${desc}\n\nالمتاح حالياً بالمخزن (${fmt(avail)}) أقل من كمية الوارد (${fmt(receipt.qty)})، يعني جزء منه اتباع. لو اتحذف المتبقي هيبقى بالسالب.\n\nاحذف عمليات البيع المرتبطة أولاً، أو عدّل الرصيد الفعلي للصنف.`);
+        return;
+      }
+    }
     if(!confirm(`⚠️ تحذير: حذف حركة وارد\n\n${desc}\n\nهذه الحركة مرتبطة بعملية وارد. سيتم حذف الوارد نفسه من قسم المبيعات والواردات، وسيتم خصم هذه الكمية من المخزون الحالي.${tail}`)) return;
     db.collection('stockReceipts').doc(receipt.id).delete().then(()=> deleteMovementsBySource(receipt.id)).then(()=> showToast('تم حذف الوارد والحركة')).catch(fail);
   } else if(sale){
@@ -3982,7 +4048,7 @@ function deleteMovement(id){
 function getLegacyReceiptRows(){
   return stockMovements.filter(m=> m.type==='in' && m.sourceType==='manual').map(m=>{
     const it = items.find(i=>i.id===m.itemId);
-    return {id:m.id, legacy:true, date:m.date, itemId:m.itemId, itemName:m.itemName, sku:(it&&it.sku)||'', color:m.color||'', qty:m.qty, supplier:'',
+    return {id:m.id, legacy:true, date:m.date, itemId:m.itemId, itemType:m.itemType, itemName:m.itemName, sku:(it&&it.sku)||'', color:m.color||'', qty:m.qty, supplier:'',
             note: m.note || ''};
   });
 }
@@ -3995,10 +4061,10 @@ function getReceiptRows(from, to){
 function renderRcCalendarGrid(){
   const grid = document.getElementById('rcCalendarGrid'), t = document.getElementById('rcCalendarTitle');
   if(!grid||!t) return;
-  if(!rcCalendarMonth){ const p = parseYmd(document.getElementById('rcFilterDateFrom').value) || parseYmd(new Date().toISOString().slice(0,10)); rcCalendarMonth = new Date(p.y, p.mo-1, 1); }
+  if(!rcCalendarMonth){ const p = parseYmd(document.getElementById('rcFilterDateFrom').value) || parseYmd(todayStr()); rcCalendarMonth = new Date(p.y, p.mo-1, 1); }
   const y = rcCalendarMonth.getFullYear(), m = rcCalendarMonth.getMonth();
   t.textContent = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'][m]+' '+y;
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
   const from = document.getElementById('rcFilterDateFrom').value, to = document.getElementById('rcFilterDateTo').value;
   const days = new Set(); getReceiptRows('','').forEach(r=>{ const d=String(r.date||'').slice(0,10), p=parseYmd(d); if(p&&p.y===y&&p.mo===m+1) days.add(d); });
   let h = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'].map(l=>`<div class="ds-calendar-daylabel">${l}</div>`).join('');
@@ -4014,7 +4080,7 @@ function renderRcCalendarGrid(){
 }
 function rcCalendarChangeMonth(d){ rcCalendarMonth = new Date(rcCalendarMonth.getFullYear(), rcCalendarMonth.getMonth()+d, 1); renderRcCalendarGrid(); }
 function rcCalendarGoToday(){
-  const t = new Date().toISOString().slice(0,10), p = parseYmd(t);
+  const t = todayStr(), p = parseYmd(t);
   rcCalendarMonth = new Date(p.y, p.mo-1, 1);
   document.getElementById('rcFilterDateFrom').value = t; document.getElementById('rcFilterDateTo').value = t; renderReceipts();
 }
@@ -4044,7 +4110,7 @@ function renderReceipts(){
   renderRcCalendarGrid();
   if(!rows.length){ box.innerHTML = '<div class="card"><div class="empty">لا يوجد وارد في الفترة المحددة.</div></div>'; return; }
   /* تقسيم الوارد حسب نوع الصنف: بالطقم / بالقطعة (الصنف المحذوف يُحسب بالطقم) - بنفس أسلوب المبيعات */
-  const isPieceRow = r=>{ const it = items.find(i=> i.id===r.itemId); return !!(it && itemIsPiece(it)); };
+  const isPieceRow = recIsPiece;
   const setRows = rows.filter(r=> !isPieceRow(r));
   const pieceRows = rows.filter(isPieceRow);
 
@@ -4094,7 +4160,7 @@ function exportReceiptsCsv(){
 let currentDailySalesExport = null;
 
 function setDailySalesToday(){
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
   document.getElementById('dsFilterDateFrom').value = today;
   document.getElementById('dsFilterDateTo').value = today;
   renderDailySales();
@@ -4109,6 +4175,7 @@ function getUnifiedSaleRows(){
     merchantId: r.merchantId || ((merchantProfiles.find(p=> normalizeMerchantName(p.name)===normalizeMerchantName(r.merchantName))||{}).id || null),
     merchantName: r.merchantName,
     itemId: r.itemId,
+    itemType: r.itemType,
     itemName: r.itemName,
     sku: r.sku,
     color: r.color,
@@ -4136,7 +4203,7 @@ function getUnifiedSaleRows(){
         sku: '-',
         color: it.color||'',
         qty: it.qty,
-        price: it.unitPrice,
+        price: Math.max(0, (Number(it.unitPrice)||0) - (Number(it.discount)||0)),
         source: 'legacy',
         sourceLabel
       });
@@ -4167,7 +4234,7 @@ function ensureDsCalendarMonth(){
   if(dsCalendarMonth) return;
   const parsed = parseYmd(document.getElementById('dsFilterDateFrom')?.value);
   if(parsed){ dsCalendarMonth = new Date(parsed.y, parsed.mo-1, 1); return; }
-  const t = parseYmd(new Date().toISOString().slice(0,10));
+  const t = parseYmd(todayStr());
   dsCalendarMonth = new Date(t.y, t.mo-1, 1);
 }
 
@@ -4178,7 +4245,7 @@ function dsCalendarChangeMonth(delta){
 }
 
 function dsCalendarGoToday(){
-  const todayStr = new Date().toISOString().slice(0,10);
+  const todayStr = todayStr();
   const t = parseYmd(todayStr);
   dsCalendarMonth = new Date(t.y, t.mo-1, 1);
   document.getElementById('dsFilterDateFrom').value = todayStr;
@@ -4222,7 +4289,7 @@ function renderDsCalendarGrid(){
   const dayLabels = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
   const startOffset = new Date(year, month, 1).getDay(); // 0=أحد
   const daysInMonth = new Date(year, month+1, 0).getDate();
-  const todayStr = new Date().toISOString().slice(0,10);
+  const todayStr = todayStr();
   const fromDate = document.getElementById('dsFilterDateFrom')?.value || '';
   const toDate = document.getElementById('dsFilterDateTo')?.value || '';
 
@@ -4275,7 +4342,7 @@ function renderDailySales(){
   }
 
   /* تقسيم المبيعات حسب نوع الصنف: بالطقم / بالقطعة (الصنف المحذوف يُحسب بالطقم) */
-  const isPieceRow = r=>{ const it = items.find(i=> i.id===r.itemId); return !!(it && itemIsPiece(it)); };
+  const isPieceRow = recIsPiece;
   const setRows = rows.filter(r=> !isPieceRow(r));
   const pieceRows = rows.filter(isPieceRow);
 
@@ -4454,7 +4521,7 @@ async function downloadXlsxWorkbook(wb, filename){
   URL.revokeObjectURL(url);
 }
 /* الصنف المحذوف يُحسب بالطقم - نفس منطق العرض على الشاشة */
-function isPieceExportRow(r){ const it = items.find(i=> i.id===r.itemId); return !!(it && itemIsPiece(it)); }
+function isPieceExportRow(r){ return recIsPiece(r); }
 
 async function exportDailySalesXlsx(){
   if(!currentDailySalesExport || currentDailySalesExport.rows.length===0){ showToast('لا توجد مبيعات لتصديرها'); return; }
@@ -4538,9 +4605,14 @@ function renderDashboard(){
     const totalStock = list.reduce((s,i)=> s + stockTotalFor(i), 0);
     const totalIssued = list.reduce((s,i)=> s + issuedShownFor(i), 0);
     const stockValue = list.reduce((s,i)=> s + itemStockValue(i), 0);
-    const pieceIds = new Set(items.filter(i=> itemIsPiece(i)).map(i=> i.id));
-    const revenue = saleEntries.filter(r=> isPieceGroup ? pieceIds.has(r.itemId) : !pieceIds.has(r.itemId))
-      .reduce((s,r)=> s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
+    const inGroup = r=> isPieceGroup ? recIsPiece(r) : !recIsPiece(r);
+    const saleRev = saleEntries.filter(inGroup).reduce((s,r)=> s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
+    /* السجل القديم (معاملات التجار المفتوحة والمؤرشفة) داخل في الإيرادات كمان، صافي الخصم */
+    const legacyRev = merchantTxs.concat(archivedMerchantTxs).reduce((sum,tx)=> sum + (tx.items||[]).reduce((s2,it)=>{
+      if(!inGroup(it)) return s2;
+      return s2 + (it.subtotal!=null ? (Number(it.subtotal)||0) : (Number(it.qty)||0)*(Number(it.unitPrice)||0));
+    },0), 0);
+    const revenue = saleRev + legacyRev;
     const set = (id,v)=>{ const el = document.getElementById(id+suffix); if(el) el.textContent = fmt(v); };
     set('statItemsCount', list.length);
     set('statTotalStock', totalStock);
@@ -4657,7 +4729,7 @@ function renderOrders(){
   const statusLabel = {pending:'⏳ جديد / قيد الانتظار', confirmed:'✅ مؤكد', done:'📦 تم التسليم', cancelled:'❌ ملغي'};
 
   container.innerHTML = list.map(order=>{
-    const date = order.createdAt?.toDate ? fmtDate(order.createdAt.toDate().toISOString().slice(0,10)) : '—';
+    const date = order.createdAt?.toDate ? fmtDate(localYmd(order.createdAt.toDate())) : '—';
     const time = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '';
     const itemsRows = (order.items||[]).map(it=>`
       <tr>
@@ -4768,19 +4840,29 @@ function orderShortages(order){
   });
   return out;
 }
+const _convertingOrders = new Set();
 function convertOrderToSales(orderId){
   const order = orders.find(o=>o.id===orderId);
   if(!order){ showToast('الطلب غير موجود'); return; }
+  if(_convertingOrders.has(orderId)) return;
+  if(order.convertedAt || saleEntries.some(e=> e.sourceOrderId===orderId)){ showToast('الطلب ده اتحول لمبيعات قبل كده'); return; }
+  const unlinked = (order.items||[]).filter(it=> !it.itemId || !_itemById(it.itemId));
+  if(unlinked.length && !confirm('تنبيه: البنود دي مش مربوطة بصنف موجود في المخزن، وهتتسجل مبيعات من غير ما تتخصم من المخزون:\n'+unlinked.map(it=>'• '+(it.itemName||'—')).join('\n')+'\n\nتكمل رغم كده؟')) return;
   const shortages = orderShortages(order);
   if(shortages.length && !confirm('تنبيه: المخزون الحالي لا يكفي لبعض البنود:\n'+shortages.join('\n')+'\n\nتحويل الطلب رغم ذلك؟')) return;
   if(!confirm(`تحويل طلب "${order.merchantName}" (${(order.items||[]).length} أصناف) إلى مبيعات؟\nسيُضاف كل صنف في الطلب كعملية بيع منفصلة في المبيعات والواردات.`)) return;
 
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
   const batch = db.batch();
+  const orderProfile = merchantProfiles.find(p=> normalizeMerchantName(p.name)===normalizeMerchantName(order.merchantName))
+    || (order.merchantPhone ? merchantProfiles.find(p=> p.phone && normalizePhoneDigits(p.phone)===normalizePhoneDigits(order.merchantPhone)) : null);
 
   (order.items||[]).forEach(it=>{
     const ref = db.collection('saleEntries').doc();
+    const _oit = _itemById(it.itemId);
     batch.set(ref, {
+      merchantId: orderProfile ? orderProfile.id : '',
+      itemType: (_oit && itemIsPiece(_oit)) ? 'piece' : 'set',
       merchantName: order.merchantName||'',
       merchantPhone: order.merchantPhone||'',
       itemId: it.itemId||'',
@@ -4799,6 +4881,8 @@ function convertOrderToSales(orderId){
     if(it.itemId){
       const movRef = db.collection('stockMovements').doc();
       batch.set(movRef, {
+        itemType: (_oit && itemIsPiece(_oit)) ? 'piece' : 'set',
+        color: it.color||'',
         itemId: it.itemId,
         itemName: it.itemName||'',
         type: 'out',
@@ -4815,11 +4899,13 @@ function convertOrderToSales(orderId){
   const orderRef = db.collection('orders').doc(orderId);
   batch.update(orderRef, {status:'done', convertedAt: firebase.firestore.FieldValue.serverTimestamp()});
 
+  _convertingOrders.add(orderId);
   batch.commit()
     .then(()=>{
+      _convertingOrders.delete(orderId);
       showToast('✅ تم تحويل الطلب لمبيعات بنجاح');
     })
-    .catch(e=> showToast('خطأ: '+e.message));
+    .catch(e=>{ _convertingOrders.delete(orderId); showToast('خطأ: '+e.message); });
 }
 
 /* ===================== BOOT ===================== */
@@ -4828,7 +4914,7 @@ function convertOrderToSales(orderId){
   if(config){
     initFirebaseWithConfig(config);
   }
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayStr();
   const saleDateEl = document.getElementById('saleDate');
   if(saleDateEl) saleDateEl.value = today;
 })();
