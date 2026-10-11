@@ -396,6 +396,20 @@
     .color-add-row input{min-height:48px; font-size:16px;}
     .color-add-row .color-add-btn{min-height:48px; font-size:15px;}
   }
+  /* ===== شاشات الكمبيوتر فقط: كل لون في سطر واحد مضغوط (صورة | اسم | كمية | سعر | حذف) ===== */
+  @media(min-width:900px){
+    #itemModalOverlay .modal{max-width:680px;}
+    .color-rows{gap:6px; margin-top:8px;}
+    .color-row{display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:12px;}
+    .color-row-top{display:contents;}
+    .color-row .color-chip-thumb{order:1; width:34px; height:34px; font-size:15px;}
+    .color-row .color-chip-thumb .cq-img-x{width:18px; height:18px; line-height:18px; font-size:10px; top:-6px; left:-6px;}
+    .color-row .cq-name{order:2; flex:1 1 auto; min-height:36px; padding:6px 10px; font-size:14px; border-radius:10px;}
+    .color-row-fields{order:3; margin-top:0; gap:8px; flex:0 0 auto;}
+    .color-row-fields label{flex:0 0 auto; flex-direction:row; align-items:center; gap:6px;}
+    .color-row-fields input{width:90px; min-height:36px; padding:6px 8px; font-size:14px; border-radius:10px;}
+    .color-row .cq-x{order:4; width:30px; height:30px; font-size:16px;}
+  }
   .color-qty-chip{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 6px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:12px; font-weight:700; color:var(--ink-2);}
   .color-qty-chip input{width:56px; padding:3px 6px; font-size:12px; border-radius:14px; text-align:center;}
   .color-qty-chip .cq-x{cursor:pointer; font-weight:800; color:var(--muted); padding:0 2px;}
