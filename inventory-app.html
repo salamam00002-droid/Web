@@ -3398,9 +3398,20 @@ function populateDsFilterItem(){
   const sel = document.getElementById('dsFilterItem');
   if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">كل الأصناف</option>' + items.map(i=>
-    `<option value="${i.id}">${escapeHtml(i.name)}</option>`
-  ).join('');
+  /* نفس أصناف قسمي "أصناف بالطقم" و"أصناف بالقطعة" (غير المؤرشفة)، كل اسم مرة واحدة داخل كل قسم */
+  const build = pc=>{
+    const seen = new Set(), out = [];
+    items.filter(i=> !i.archived && itemIsPiece(i)===pc).forEach(i=>{
+      const n = String(i.name||'').trim();
+      if(n && !seen.has(n)){ seen.add(n); out.push(`<option value="${pc?'piece':'set'}:${escapeHtml(n)}">${escapeHtml(n)}</option>`); }
+    });
+    return out;
+  };
+  const sets = build(false), pcs = build(true);
+  let h = '<option value="">كل الأصناف</option>';
+  if(sets.length) h += `<optgroup label="🧳 أصناف بالطقم">${sets.join('')}</optgroup>`;
+  if(pcs.length)  h += `<optgroup label="🧩 أصناف بالقطعة">${pcs.join('')}</optgroup>`;
+  sel.innerHTML = h;
   if(current) sel.value = current;
 }
 
@@ -4312,7 +4323,7 @@ function getDailySalesRows(fromDay, toDay, merchantId, itemId){
   if(toDay) rows = rows.filter(r=> (r.date||'') <= toDay);
   if(merchantId) rows = rows.filter(r=> r.merchantId===merchantId);
   if(itemId===undefined) itemId = document.getElementById('dsFilterItem')?.value || '';
-  if(itemId) rows = rows.filter(r=> r.itemId===itemId);
+  if(itemId) rows = rows.filter(r=> (recIsPiece(r)?'piece':'set')+':'+String(r.itemName||'').trim()===itemId);
   rows.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.merchantName||'').localeCompare(b.merchantName||''));
   return rows;
 }
