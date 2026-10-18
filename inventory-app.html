@@ -747,6 +747,7 @@
   .orders-empty .big{font-size:48px;margin-bottom:12px;}
   /* ========== END ORDERS STYLES ========== */
 
+  .ds-search-printonly{display:none;}
   @media print{
     body.printing-statement > *:not(#statementModalOverlay){display:none !important;}
     body.printing-statement{padding:0; background:#fff;}
@@ -786,6 +787,27 @@
     #dailySalesPrintArea .section-head{page-break-after:avoid; margin:16px 0 6px !important;}
     #dailySalesPrintArea .section-head h2{font-size:13px !important; color:#000 !important;}
     #dailySalesPrintArea .section-head .page-sub{font-size:11px !important; color:#000 !important;}
+    /* ---- طباعة نتيجة البحث بالصنف / بالتاجر ---- */
+    body.printing-dssearch > *:not(main){display:none !important;}
+    body.printing-dssearch{padding:0; background:#fff; min-height:0;}
+    body.printing-dssearch main{max-width:100%; margin:0; padding:0;}
+    body.printing-dssearch .view:not(#view-dailysales){display:none !important;}
+    body.printing-dssearch #view-dailysales > *:not(#dsSearchPanel){display:none !important;}
+    body.printing-dssearch .ds-search-noprint{display:none !important;}
+    body.printing-dssearch .ds-search-printonly{display:block !important; font-size:14px; font-weight:800; margin:0 0 8px; color:#000;}
+    body.printing-dssearch #dsSearchPanel{box-shadow:none !important; border:none !important; padding:0 !important; color:#000;}
+    #dsSearchPanel .card{box-shadow:none !important; border:none !important; padding:0 !important; overflow:visible !important;}
+    #dsSearchPanel table{width:100% !important; border-collapse:collapse !important; table-layout:fixed; page-break-inside:auto;}
+    #dsSearchPanel th, #dsSearchPanel td{
+      border:1px solid #000 !important; padding:6px 8px !important;
+      text-align:center !important; vertical-align:middle; font-size:12px !important; word-break:break-word;
+    }
+    #dsSearchPanel thead{display:table-header-group;}
+    #dsSearchPanel thead th{background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; font-weight:800 !important;}
+    #dsSearchPanel tr{page-break-inside:avoid; page-break-after:auto;}
+    #dsSearchPanel .section-head{page-break-after:avoid; margin:16px 0 6px !important;}
+    #dsSearchPanel .section-head h2{font-size:13px !important; color:#000 !important;}
+    #dsSearchPanel .section-head .page-sub{font-size:11px !important; color:#000 !important;}
     body.printing-receipts > *:not(main){display:none !important;}
     body.printing-receipts{padding:0; background:#fff; min-height:0;}
     body.printing-receipts main{max-width:100%; margin:0; padding:0;}
@@ -1200,6 +1222,28 @@
           <option value="">كل الأصناف</option>
         </select>
       </div>
+    </div>
+
+    <div class="card ds-sales-only" id="dsSearchPanel" style="padding:14px 16px; margin-bottom:14px;">
+      <div class="section-head" style="margin:0 0 10px;">
+        <h2 style="font-size:15px;">🔎 بحث بالصنف أو بالتاجر (كل الفترات)</h2>
+        <div class="ds-search-noprint" style="display:flex; gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="exportDsSearchXlsx()">⬇️ تصدير</button>
+          <button class="btn btn-gold btn-sm" onclick="printDsSearch()">🖨️ طباعة</button>
+        </div>
+      </div>
+      <div id="dsSearchPrintTitle" class="ds-search-printonly"></div>
+      <div class="filters-row ds-search-noprint" style="margin-bottom:8px;">
+        <div class="field">
+          <label>بحث بالصنف</label>
+          <select id="dsSearchItem" onchange="renderDsSearch()"><option value="">اختر الصنف</option></select>
+        </div>
+        <div class="field">
+          <label>بحث بالتاجر</label>
+          <select id="dsSearchMerchant" onchange="renderDsSearch()"><option value="">اختر التاجر</option></select>
+        </div>
+      </div>
+      <div id="dsSearchResult"></div>
     </div>
 
     <div id="dailySalesPrintArea" class="ds-sales-only">
@@ -3413,6 +3457,12 @@ function populateDsFilterItem(){
   if(pcs.length)  h += `<optgroup label="🧩 أصناف بالقطعة">${pcs.join('')}</optgroup>`;
   sel.innerHTML = h;
   if(current) sel.value = current;
+  const ss = document.getElementById('dsSearchItem');
+  if(ss){
+    const cur2 = ss.value;
+    ss.innerHTML = h.replace('كل الأصناف','اختر الصنف');
+    if(cur2) ss.value = cur2;
+  }
 }
 
 function populateDsFilterMerchant(){
@@ -3420,10 +3470,101 @@ function populateDsFilterMerchant(){
   const sel = document.getElementById('dsFilterMerchant');
   if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">كل التجار</option>' + merchantProfiles.map(p=>
+  const mHtml = merchantProfiles.map(p=>
     `<option value="${p.id}">${escapeHtml(p.name)}</option>`
   ).join('');
+  sel.innerHTML = '<option value="">كل التجار</option>' + mHtml;
   if(current) sel.value = current;
+  const sm = document.getElementById('dsSearchMerchant');
+  if(sm){
+    const cur2 = sm.value;
+    sm.innerHTML = '<option value="">اختر التاجر</option>' + mHtml;
+    if(cur2) sm.value = cur2;
+  }
+}
+
+/* بحث بالصنف / بالتاجر: كل الفترات، بدون تأثر بفلتر التاريخ */
+let currentDsSearchExport = null;
+function printDsSearch(){
+  if(!currentDsSearchExport || !currentDsSearchExport.rows.length){ showToast('لا توجد نتائج بحث للطباعة'); return; }
+  document.body.classList.add('printing-dssearch');
+  window.print();
+  setTimeout(()=> document.body.classList.remove('printing-dssearch'), 300);
+}
+async function exportDsSearchXlsx(){
+  if(!currentDsSearchExport || !currentDsSearchExport.rows.length){ showToast('لا توجد نتائج بحث لتصديرها'); return; }
+  const s = currentDsSearchExport;
+  const header = ['التاجر','الصنف','اللون','تاريخ الشراء','الكمية'];
+  const groups = [
+    {sheet:'بحث - بالطقم',  title:'نتيجة البحث — مبيعات بالطقم',  list: s.rows.filter(r=> !recIsPiece(r))},
+    {sheet:'بحث - بالقطعة', title:'نتيجة البحث — مبيعات بالقطعة', list: s.rows.filter(r=> recIsPiece(r))}
+  ];
+  const wb = new ExcelJS.Workbook();
+  groups.forEach(g=>{
+    if(!g.list.length) return;
+    const data = g.list.map(r=> [r.merchantName||'-', r.itemName||'-', r.color||'-', r.date ? fmtDate(r.date) : '-', Number(r.qty)||0]);
+    const total = g.list.reduce((t,r)=> t + (Number(r.qty)||0), 0);
+    addStyledXlsxSheet(wb, g.sheet, g.title, s.subtitle||'', header, data, ['','','','الإجمالي', total]);
+  });
+  await downloadXlsxWorkbook(wb, 'بحث المبيعات.xlsx');
+}
+function renderDsSearch(){
+  const box = document.getElementById('dsSearchResult');
+  if(!box) return;
+  const itemKey = document.getElementById('dsSearchItem')?.value || '';
+  const merchantId = document.getElementById('dsSearchMerchant')?.value || '';
+  const selText = id=>{ const e = document.getElementById(id); return (e && e.value && e.selectedOptions[0]) ? e.selectedOptions[0].textContent.trim() : ''; };
+  const subParts = [];
+  if(selText('dsSearchItem')) subParts.push('الصنف: ' + selText('dsSearchItem'));
+  if(selText('dsSearchMerchant')) subParts.push('التاجر: ' + selText('dsSearchMerchant'));
+  const subtitle = subParts.join(' — ');
+  const ptEl = document.getElementById('dsSearchPrintTitle');
+  if(ptEl) ptEl.textContent = subtitle ? ('بحث في المبيعات — ' + subtitle) : '';
+  currentDsSearchExport = null;
+  if(!itemKey && !merchantId){
+    box.innerHTML = '<div class="page-sub" style="margin:0;">اختر صنفًا لعرض مبيعاته والتجار اللي اشتروه، أو اختر تاجرًا لعرض الأصناف اللي اشتراها بتواريخها وألوانها.</div>';
+    return;
+  }
+  const rows = getDailySalesRows('', '', merchantId, itemKey);
+  if(!rows.length){
+    box.innerHTML = '<div class="empty">لا توجد مبيعات مطابقة.</div>';
+    return;
+  }
+  const unitOf = r=> recIsPiece(r) ? 'قطعة' : 'طقم';
+  const byItem = !itemKey && !!merchantId; /* تاجر فقط: التجميع بالصنف، غير كده: بالتاجر */
+  const groups = [];
+  rows.forEach(r=>{
+    const key = byItem ? ((recIsPiece(r)?'piece:':'set:') + String(r.itemName||'').trim()) : (r.merchantId || ('n:' + (r.merchantName||'')));
+    const title = byItem ? ((recIsPiece(r)?'🧩 ':'🧳 ') + (r.itemName||'-')) : ('👤 ' + (r.merchantName||'-'));
+    let g = groups.find(x=> x.key===key);
+    if(!g){ g = {key, title, rows:[]}; groups.push(g); }
+    g.rows.push(r);
+  });
+  currentDsSearchExport = {subtitle, rows: groups.flatMap(g=> g.rows)};
+  const totalQty = rows.reduce((t,r)=> t + (Number(r.qty)||0), 0);
+  const unitAll = [...new Set(rows.map(unitOf))].join(' / ');
+  const summary = byItem
+    ? `${groups.length} صنف — ${fmt(totalQty)} ${unitAll} (${rows.length} عملية)`
+    : `${groups.length} تاجر — ${fmt(totalQty)} ${unitAll} (${rows.length} عملية)`;
+  box.innerHTML = `<div class="page-sub" style="margin:0 0 8px; font-weight:800;">${summary}</div>` + groups.map(g=>{
+    const qty = g.rows.reduce((t,r)=> t + (Number(r.qty)||0), 0);
+    const trs = g.rows.map(r=>`<tr>
+      <td>${r.date ? fmtDate(r.date) : '-'}</td>
+      <td>${escapeHtml(r.color||'-')}</td>
+      <td class="money">${fmt(r.qty)} ${unitOf(r)}</td>
+    </tr>`).join('');
+    return `
+    <div class="section-head" style="margin:14px 0 6px;">
+      <h2 style="font-size:14px;">${escapeHtml(g.title)}</h2>
+      <span class="page-sub" style="margin:0;">${fmt(qty)} (${g.rows.length} عملية)</span>
+    </div>
+    <div class="card" style="overflow-x:auto; margin-bottom:10px;">
+      <table>
+        <thead><tr><th>تاريخ الشراء</th><th>اللون</th><th>الكمية</th></tr></thead>
+        <tbody>${trs}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 }
 
 function populateSaleUnits(itemId){
@@ -4423,6 +4564,7 @@ function renderDsCalendarGrid(){
 }
 
 function renderDailySales(){
+  renderDsSearch();
   const fromDay = document.getElementById('dsFilterDateFrom')?.value || '';
   const toDay = document.getElementById('dsFilterDateTo')?.value || '';
   const merchantId = document.getElementById('dsFilterMerchant')?.value || '';
