@@ -1194,6 +1194,12 @@
           <option value="">كل التجار</option>
         </select>
       </div>
+      <div class="field">
+        <label>فلتر بالصنف</label>
+        <select id="dsFilterItem" onchange="renderDailySales()">
+          <option value="">كل الأصناف</option>
+        </select>
+      </div>
     </div>
 
     <div id="dailySalesPrintArea" class="ds-sales-only">
@@ -3388,7 +3394,18 @@ function populateSaleItemSelect(){
   if(current) sel.value = current;
 }
 
+function populateDsFilterItem(){
+  const sel = document.getElementById('dsFilterItem');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">كل الأصناف</option>' + items.map(i=>
+    `<option value="${i.id}">${escapeHtml(i.name)}</option>`
+  ).join('');
+  if(current) sel.value = current;
+}
+
 function populateDsFilterMerchant(){
+  populateDsFilterItem();
   const sel = document.getElementById('dsFilterMerchant');
   if(!sel) return;
   const current = sel.value;
@@ -4289,11 +4306,13 @@ function getUnifiedSaleRows(){
 }
 
 /* fromDay/toDay بصيغة YYYY-MM-DD؛ أي منهم يقدر يبقى فاضي (فلتر مفتوح من جهة واحدة أو من غير فلتر تاريخ خالص) */
-function getDailySalesRows(fromDay, toDay, merchantId){
+function getDailySalesRows(fromDay, toDay, merchantId, itemId){
   let rows = getUnifiedSaleRows();
   if(fromDay) rows = rows.filter(r=> (r.date||'') >= fromDay);
   if(toDay) rows = rows.filter(r=> (r.date||'') <= toDay);
   if(merchantId) rows = rows.filter(r=> r.merchantId===merchantId);
+  if(itemId===undefined) itemId = document.getElementById('dsFilterItem')?.value || '';
+  if(itemId) rows = rows.filter(r=> r.itemId===itemId);
   rows.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.merchantName||'').localeCompare(b.merchantName||''));
   return rows;
 }
